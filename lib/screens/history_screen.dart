@@ -70,9 +70,7 @@ class HistoryScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(
-              child: Text('오류: ${snapshot.error}'),
-            );
+            return Center(child: Text('오류: ${snapshot.error}'));
           }
 
           final history = snapshot.data ?? [];
@@ -146,10 +144,7 @@ class HistoryItemCard extends StatelessWidget {
           color: theme.colorScheme.error,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          Icons.delete,
-          color: theme.colorScheme.onError,
-        ),
+        child: Icon(Icons.delete, color: theme.colorScheme.onError),
       ),
       child: Card(
         elevation: 0,

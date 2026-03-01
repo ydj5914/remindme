@@ -24,7 +24,9 @@ class NotificationService {
     tz.initializeTimeZones();
 
     // Android 설정
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
 
     // iOS 설정
     const iosSettings = DarwinInitializationSettings(
@@ -79,7 +81,8 @@ class NotificationService {
 
     await _notifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(androidChannel);
   }
 
@@ -113,10 +116,7 @@ class NotificationService {
     final tzTime = tz.TZDateTime.from(targetTime, tz.local);
 
     // Payload에 알람 ID 포함
-    final payload = jsonEncode({
-      'alarmId': alarmId,
-      'content': content,
-    });
+    final payload = jsonEncode({'alarmId': alarmId, 'content': content});
 
     // Android 알림 액션 버튼 정의
     const completeAction = AndroidNotificationAction(
@@ -199,10 +199,7 @@ class NotificationService {
       final snoozeTime = DateTime.now().add(Duration(minutes: snoozeMinutes));
       final tzTime = tz.TZDateTime.from(snoozeTime, tz.local);
 
-      final payload = jsonEncode({
-        'alarmId': alarmId,
-        'content': content,
-      });
+      final payload = jsonEncode({'alarmId': alarmId, 'content': content});
 
       const completeAction = AndroidNotificationAction(
         'complete',

@@ -14,9 +14,7 @@ void main() async {
   await initializeDateFormatting('ko', null);
 
   // Firebase 초기화
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // 알림 서비스 초기화 (알림 클릭 콜백 포함)
   await NotificationService().initialize(

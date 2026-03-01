@@ -6,6 +6,21 @@ enum RepeatType {
   custom, // 사용자 지정
 }
 
+enum AlarmCategory {
+  work, // 업무
+  personal, // 개인
+  health, // 건강
+  other, // 기타
+}
+
+enum AlarmSound {
+  defaultSound, // 기본
+  gentle, // 부드러운
+  classic, // 클래식
+  digital, // 디지털
+  nature, // 자연
+}
+
 class AlarmItem {
   final String id;
   final DateTime time;
@@ -16,6 +31,9 @@ class AlarmItem {
   final RepeatType repeatType;
   final List<int>? customDays; // 0=월, 1=화, ..., 6=일
   final int snoozeCount; // 스누즈된 횟수
+  final AlarmCategory category; // 카테고리
+  final AlarmSound sound; // 알람 소리
+  final String? voiceMemoPath; // 음성 메모 경로
 
   AlarmItem({
     required this.id,
@@ -27,6 +45,9 @@ class AlarmItem {
     this.repeatType = RepeatType.daily,
     this.customDays,
     this.snoozeCount = 0,
+    this.category = AlarmCategory.personal,
+    this.sound = AlarmSound.defaultSound,
+    this.voiceMemoPath,
   }) : createdAt = createdAt ?? DateTime.now();
 
   // Firestore로부터 데이터 읽기
@@ -50,6 +71,15 @@ class AlarmItem {
           ? List<int>.from(data['customDays'] as List)
           : null,
       snoozeCount: data['snoozeCount'] as int? ?? 0,
+      category: AlarmCategory.values.firstWhere(
+        (e) => e.name == (data['category'] as String?),
+        orElse: () => AlarmCategory.personal,
+      ),
+      sound: AlarmSound.values.firstWhere(
+        (e) => e.name == (data['sound'] as String?),
+        orElse: () => AlarmSound.defaultSound,
+      ),
+      voiceMemoPath: data['voiceMemoPath'] as String?,
     );
   }
 
@@ -66,6 +96,9 @@ class AlarmItem {
       'repeatType': repeatType.name,
       'customDays': customDays,
       'snoozeCount': snoozeCount,
+      'category': category.name,
+      'sound': sound.name,
+      'voiceMemoPath': voiceMemoPath,
     };
   }
 
@@ -79,6 +112,9 @@ class AlarmItem {
     RepeatType? repeatType,
     List<int>? customDays,
     int? snoozeCount,
+    AlarmCategory? category,
+    AlarmSound? sound,
+    String? voiceMemoPath,
   }) {
     return AlarmItem(
       id: id ?? this.id,
@@ -90,6 +126,9 @@ class AlarmItem {
       repeatType: repeatType ?? this.repeatType,
       customDays: customDays ?? this.customDays,
       snoozeCount: snoozeCount ?? this.snoozeCount,
+      category: category ?? this.category,
+      sound: sound ?? this.sound,
+      voiceMemoPath: voiceMemoPath ?? this.voiceMemoPath,
     );
   }
 
@@ -129,6 +168,47 @@ class AlarmItem {
         return customDays?.contains(weekday) ?? false;
       case RepeatType.once:
         return true;
+    }
+  }
+
+  String get categoryLabel {
+    switch (category) {
+      case AlarmCategory.work:
+        return '업무';
+      case AlarmCategory.personal:
+        return '개인';
+      case AlarmCategory.health:
+        return '건강';
+      case AlarmCategory.other:
+        return '기타';
+    }
+  }
+
+  String get soundLabel {
+    switch (sound) {
+      case AlarmSound.defaultSound:
+        return '기본';
+      case AlarmSound.gentle:
+        return '부드러운';
+      case AlarmSound.classic:
+        return '클래식';
+      case AlarmSound.digital:
+        return '디지털';
+      case AlarmSound.nature:
+        return '자연';
+    }
+  }
+
+  Color get categoryColor {
+    switch (category) {
+      case AlarmCategory.work:
+        return const Color(0xFF2196F3); // 파란색
+      case AlarmCategory.personal:
+        return const Color(0xFF9C27B0); // 보라색
+      case AlarmCategory.health:
+        return const Color(0xFF4CAF50); // 초록색
+      case AlarmCategory.other:
+        return const Color(0xFF757575); // 회색
     }
   }
 }

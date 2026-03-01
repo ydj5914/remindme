@@ -7,10 +7,7 @@ import 'package:intl/intl.dart';
 class AlarmDetailScreen extends StatelessWidget {
   final AlarmItem alarm;
 
-  const AlarmDetailScreen({
-    super.key,
-    required this.alarm,
-  });
+  const AlarmDetailScreen({super.key, required this.alarm});
 
   @override
   Widget build(BuildContext context) {
@@ -18,19 +15,13 @@ class AlarmDetailScreen extends StatelessWidget {
     final timeFormat = DateFormat('HH:mm');
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('알람 상세'),
-      ),
+      appBar: AppBar(title: const Text('알람 상세')),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.alarm,
-              size: 100,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(Icons.alarm, size: 100, color: theme.colorScheme.primary),
             const SizedBox(height: 32),
             Text(
               timeFormat.format(alarm.time),
@@ -51,11 +42,9 @@ class AlarmDetailScreen extends StatelessWidget {
                 await AlarmService().completeAlarm(alarm.id);
                 if (context.mounted) {
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('알람이 완료되었습니다'),
-                    ),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('알람이 완료되었습니다')));
                 }
               },
               icon: const Icon(Icons.check),

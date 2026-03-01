@@ -77,16 +77,16 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
             const SizedBox(height: 16),
 
             // 반복 설정
-            Text(
-              '반복 설정',
-              style: theme.textTheme.titleSmall,
-            ),
+            Text('반복 설정', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<RepeatType>(
               value: selectedRepeatType,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items: RepeatType.values.map((type) {
                 String label;
@@ -107,10 +107,7 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
                     label = '사용자 지정';
                     break;
                 }
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(label),
-                );
+                return DropdownMenuItem(value: type, child: Text(label));
               }).toList(),
               onChanged: (value) {
                 setState(() {
@@ -156,22 +153,22 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
         FilledButton(
           onPressed: () async {
             if (alarmContent.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('알람 내용을 입력해주세요')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('알람 내용을 입력해주세요')));
               return;
             }
             if (selectedTime == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('시간을 선택해주세요')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('시간을 선택해주세요')));
               return;
             }
             if (selectedRepeatType == RepeatType.custom &&
                 selectedDays.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('요일을 선택해주세요')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('요일을 선택해주세요')));
               return;
             }
 

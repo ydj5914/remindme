@@ -121,7 +121,10 @@ class AlarmService {
       final doc = await _alarmsCollection.doc(alarmId).get();
       if (!doc.exists) return;
 
-      final alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+      final alarm = AlarmItem.fromMap(
+        doc.id,
+        doc.data() as Map<String, dynamic>,
+      );
 
       // 1. 반복 타입에 따라 처리
       if (alarm.repeatType == RepeatType.once) {
@@ -156,10 +159,15 @@ class AlarmService {
         .limit(50)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList();
-    });
+          return snapshot.docs
+              .map(
+                (doc) => AlarmItem.fromMap(
+                  doc.id,
+                  doc.data() as Map<String, dynamic>,
+                ),
+              )
+              .toList();
+        });
   }
 
   /// 히스토리에서 알람 삭제
@@ -196,12 +204,12 @@ class AlarmService {
       return Stream.value([]);
     }
 
-    return _alarmsCollection
-        .orderBy('timeMillis')
-        .snapshots()
-        .map((snapshot) {
+    return _alarmsCollection.orderBy('timeMillis').snapshots().map((snapshot) {
       return snapshot.docs
-          .map((doc) => AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+          .map(
+            (doc) =>
+                AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>),
+          )
           .toList();
     });
   }
@@ -218,7 +226,10 @@ class AlarmService {
           .get();
 
       return snapshot.docs
-          .map((doc) => AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+          .map(
+            (doc) =>
+                AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>),
+          )
           .toList();
     } catch (e) {
       print('활성 알람 조회 실패: $e');
@@ -283,7 +294,10 @@ class AlarmService {
       final doc = await _alarmsCollection.doc(alarmId).get();
       if (!doc.exists) return;
 
-      final alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+      final alarm = AlarmItem.fromMap(
+        doc.id,
+        doc.data() as Map<String, dynamic>,
+      );
 
       // 1. Firestore에서 스누즈 카운트 증가
       await _alarmsCollection.doc(alarmId).update({

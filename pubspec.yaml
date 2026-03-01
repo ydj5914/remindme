@@ -51,6 +51,23 @@ dependencies:
   timezone: ^0.10.0
   permission_handler: ^11.3.1
 
+  # Audio
+  audioplayers: ^6.1.0
+  record: ^5.1.2
+  path_provider: ^2.1.5
+
+  # Charts
+  fl_chart: ^0.70.2
+
+  # Widgets
+  home_widget: ^0.7.0
+
+  # Storage
+  firebase_storage: ^12.3.6
+
+  # UI
+  file_picker: ^8.1.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

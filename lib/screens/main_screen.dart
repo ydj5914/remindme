@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'history_screen.dart';
+import 'statistics_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -15,6 +16,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = const [
     RemindMeHomeScreen(),
     HistoryScreen(),
+    StatisticsScreen(),
   ];
 
   @override
@@ -38,6 +40,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.history),
             selectedIcon: Icon(Icons.history),
             label: '히스토리',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bar_chart),
+            selectedIcon: Icon(Icons.bar_chart),
+            label: '통계',
           ),
         ],
       ),

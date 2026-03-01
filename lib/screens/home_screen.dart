@@ -53,8 +53,9 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                       return Theme(
                         data: Theme.of(context).copyWith(
                           timePickerTheme: TimePickerThemeData(
-                            backgroundColor:
-                                Theme.of(context).colorScheme.surface,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.surface,
                           ),
                         ),
                         child: child!,
@@ -90,9 +91,9 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                   return;
                 }
                 if (selectedTime == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('시간을 선택해주세요')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('시간을 선택해주세요')));
                   return;
                 }
 
@@ -146,15 +147,15 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
     try {
       await _alarmService.deleteAlarm(alarm);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('알람이 삭제되었습니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('알람이 삭제되었습니다')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('알람 삭제 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('알람 삭제 실패: $e')));
       }
     }
   }
@@ -164,9 +165,9 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
       await _alarmService.toggleAlarm(alarm);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('알람 토글 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('알람 토글 실패: $e')));
       }
     }
   }
@@ -195,9 +196,9 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
             onPressed: () async {
               await _alarmService.syncAlarms();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('알람이 동기화되었습니다')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('알람이 동기화되었습니다')));
               }
             },
           ),
@@ -215,16 +216,9 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: colorScheme.error,
-                  ),
+                  Icon(Icons.error_outline, size: 64, color: colorScheme.error),
                   const SizedBox(height: 16),
-                  Text(
-                    '오류가 발생했습니다',
-                    style: theme.textTheme.titleLarge,
-                  ),
+                  Text('오류가 발생했습니다', style: theme.textTheme.titleLarge),
                   const SizedBox(height: 8),
                   Text(
                     '${snapshot.error}',
@@ -290,8 +284,9 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                               Icon(
                                 Icons.alarm_off,
                                 size: 64,
-                                color:
-                                    theme.colorScheme.onSurface.withOpacity(0.3),
+                                color: theme.colorScheme.onSurface.withOpacity(
+                                  0.3,
+                                ),
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -312,7 +307,8 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                           itemBuilder: (context, index) {
                             return AlarmItemCard(
                               alarm: alarmList[index],
-                              onToggle: (value) => _toggleAlarm(alarmList[index]),
+                              onToggle: (value) =>
+                                  _toggleAlarm(alarmList[index]),
                               onDelete: () => _deleteAlarm(alarmList[index]),
                             );
                           },
@@ -378,10 +374,7 @@ class AlarmItemCard extends StatelessWidget {
           color: theme.colorScheme.error,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          Icons.delete,
-          color: theme.colorScheme.onError,
-        ),
+        child: Icon(Icons.delete, color: theme.colorScheme.onError),
       ),
       child: Card(
         elevation: 0,
@@ -429,10 +422,7 @@ class AlarmItemCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Switch(
-                value: alarm.isActive,
-                onChanged: (_) => onToggle(),
-              ),
+              Switch(value: alarm.isActive, onChanged: (_) => onToggle()),
             ],
           ),
         ),
