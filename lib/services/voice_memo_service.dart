@@ -22,7 +22,8 @@ class VoiceMemoService {
     try {
       if (await _recorder.hasPermission()) {
         final dir = await getApplicationDocumentsDirectory();
-        final path = '${dir.path}/voice_memo_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        final path =
+            '${dir.path}/voice_memo_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
         await _recorder.start(
           const RecordConfig(
@@ -63,7 +64,8 @@ class VoiceMemoService {
       final file = File(localPath);
       if (!await file.exists()) return null;
 
-      final fileName = 'voice_memos/$userId/${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final fileName =
+          'voice_memos/$userId/${DateTime.now().millisecondsSinceEpoch}.m4a';
       final ref = _storage.ref().child(fileName);
 
       await ref.putFile(file);

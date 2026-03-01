@@ -13,9 +13,7 @@ class StatisticsScreen extends StatelessWidget {
     final alarmService = AlarmService();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('통계'),
-      ),
+      appBar: AppBar(title: const Text('통계')),
       body: StreamBuilder<List<AlarmItem>>(
         stream: alarmService.getHistoryStream(),
         builder: (context, snapshot) {
@@ -79,10 +77,7 @@ class StatisticsScreen extends StatelessWidget {
                 const SizedBox(height: 32),
 
                 // 카테고리별 통계
-                Text(
-                  '카테고리별 완료',
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text('카테고리별 완료', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 16),
                 SizedBox(
                   height: 200,
@@ -92,23 +87,14 @@ class StatisticsScreen extends StatelessWidget {
                 const SizedBox(height: 32),
 
                 // 주간 추세
-                Text(
-                  '주간 완료 추세',
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text('주간 완료 추세', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 16),
-                SizedBox(
-                  height: 200,
-                  child: _WeeklyBarChart(history: history),
-                ),
+                SizedBox(height: 200, child: _WeeklyBarChart(history: history)),
 
                 const SizedBox(height: 32),
 
                 // 시간대별 완료
-                Text(
-                  '시간대별 완료',
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text('시간대별 완료', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 16),
                 ...List.generate(24, (hour) {
                   final count = history
@@ -149,21 +135,23 @@ class StatisticsScreen extends StatelessWidget {
 
   Map<String, dynamic> _calculateStatistics(List<AlarmItem> history) {
     if (history.isEmpty) {
-      return {
-        'completionRate': 0,
-        'avgSnooze': 0,
-        'thisWeek': 0,
-      };
+      return {'completionRate': 0, 'avgSnooze': 0, 'thisWeek': 0};
     }
 
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
 
     final thisWeekCount = history
-        .where((alarm) => alarm.completedAt != null && alarm.completedAt!.isAfter(weekAgo))
+        .where(
+          (alarm) =>
+              alarm.completedAt != null && alarm.completedAt!.isAfter(weekAgo),
+        )
         .length;
 
-    final totalSnooze = history.fold<int>(0, (sum, alarm) => sum + alarm.snoozeCount);
+    final totalSnooze = history.fold<int>(
+      0,
+      (sum, alarm) => sum + alarm.snoozeCount,
+    );
     final avgSnooze = (totalSnooze / history.length).toStringAsFixed(1);
 
     return {
@@ -200,15 +188,15 @@ class _StatCard extends StatelessWidget {
             Text(
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
             Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                  ),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
             ),
           ],
         ),
@@ -285,15 +273,23 @@ class _WeeklyBarChart extends StatelessWidget {
                 toY: counts[index].toDouble(),
                 color: Theme.of(context).colorScheme.primary,
                 width: 20,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(4),
+                ),
               ),
             ],
           );
         }),
         titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
