@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/notification_service.dart';
+import '../models/alarm_item.dart';
+import '../services/alarm_service.dart';
 
 class RemindMeHomeScreen extends StatefulWidget {
   const RemindMeHomeScreen({super.key});
@@ -10,30 +11,7 @@ class RemindMeHomeScreen extends StatefulWidget {
 }
 
 class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
-  final NotificationService _notificationService = NotificationService();
-  final List<AlarmItem> _alarmList = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPendingAlarms();
-  }
-
-  Future<void> _loadPendingAlarms() async {
-    // 예약된 알람 목록 불러오기
-    final pending = await _notificationService.getPendingAlarms();
-    setState(() {
-      _alarmList.clear();
-      for (var alarm in pending) {
-        _alarmList.add(AlarmItem(
-          id: alarm.id.toString(),
-          time: DateTime.now(), // 실제로는 payload에서 파싱 필요
-          content: alarm.body ?? '알람',
-          isActive: true,
-        ));
-      }
-    });
-  }
+  final AlarmService _alarmService = AlarmService();
 
   Future<void> _showAddAlarmDialog() async {
     String alarmContent = '';
@@ -111,7 +89,6 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                 }
 
                 try {
-                  // 알람 등록
                   final now = DateTime.now();
                   final scheduledTime = DateTime(
                     now.year,
@@ -121,24 +98,11 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                     selectedTime!.minute,
                   );
 
-                  final alarmId = scheduledTime.millisecondsSinceEpoch ~/ 1000;
-
-                  await _notificationService.scheduleAlarm(
-                    id: alarmId,
-                    title: 'Remind Me',
+                  // AlarmService를 통해 Firestore + 로컬 알람 동시 등록
+                  await _alarmService.addAlarm(
                     content: alarmContent,
                     scheduledTime: scheduledTime,
                   );
-
-                  // 리스트에 추가
-                  setState(() {
-                    _alarmList.add(AlarmItem(
-                      id: alarmId.toString(),
-                      time: scheduledTime,
-                      content: alarmContent,
-                      isActive: true,
-                    ));
-                  });
 
                   if (mounted) {
                     Navigator.pop(context);
@@ -147,13 +111,17 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                         content: Text(
                           '알람이 ${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}에 설정되었습니다',
                         ),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
                       ),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('알람 설정 실패: $e')),
+                      SnackBar(
+                        content: Text('알람 설정 실패: $e'),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
                     );
                   }
                 }
@@ -167,14 +135,31 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
   }
 
   Future<void> _deleteAlarm(AlarmItem alarm) async {
-    await _notificationService.cancelAlarm(int.parse(alarm.id));
-    setState(() {
-      _alarmList.remove(alarm);
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('알람이 삭제되었습니다')),
-      );
+    try {
+      await _alarmService.deleteAlarm(alarm);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('알람이 삭제되었습니다')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('알람 삭제 실패: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleAlarm(AlarmItem alarm) async {
+    try {
+      await _alarmService.toggleAlarm(alarm);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('알람 토글 실패: $e')),
+        );
+      }
     }
   }
 
@@ -195,106 +180,148 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
           'Remind Me',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sync),
+            tooltip: '알람 동기화',
+            onPressed: () async {
+              await _alarmService.syncAlarms();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('알람이 동기화되었습니다')),
+                );
+              }
+            },
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. 인사말 섹션
-            Text(
-              '안녕하세요!',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '오늘 설정된 알람이 ${_alarmList.length}개 있습니다.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 24),
+      body: StreamBuilder<List<AlarmItem>>(
+        stream: _alarmService.getAlarmsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            // 2. 알람 리스트 섹션
-            Text(
-              '내 알람 목록',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '오류가 발생했습니다',
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${snapshot.error}',
+                    style: theme.textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
+            );
+          }
 
-            // 3. 알람 리스트 또는 빈 상태
-            Expanded(
-              child: _alarmList.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.alarm_off,
-                            size: 64,
-                            color: theme.colorScheme.onSurface.withOpacity(0.3),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '설정된 알람이 없어요.\n+ 버튼을 눌러보세요!',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color:
-                                  theme.colorScheme.onSurface.withOpacity(0.5),
-                            ),
-                          ),
-                        ],
+          final alarmList = snapshot.data ?? [];
+
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. 인사말 섹션
+                Text(
+                  '안녕하세요!',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '오늘 설정된 알람이 ${alarmList.length}개 있습니다.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 2. 알람 리스트 섹션
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '내 알람 목록',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
-                    )
-                  : ListView.separated(
-                      itemCount: _alarmList.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        return AlarmItemCard(
-                          alarm: _alarmList[index],
-                          onToggle: (value) {
-                            setState(() {
-                              _alarmList[index].isActive = value;
-                            });
-                            if (!value) {
-                              _notificationService
-                                  .cancelAlarm(int.parse(_alarmList[index].id));
-                            }
-                          },
-                          onDelete: () => _deleteAlarm(_alarmList[index]),
-                        );
-                      },
                     ),
+                    if (alarmList.isNotEmpty)
+                      Text(
+                        '← 스와이프로 삭제',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // 3. 알람 리스트 또는 빈 상태
+                Expanded(
+                  child: alarmList.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.alarm_off,
+                                size: 64,
+                                color:
+                                    theme.colorScheme.onSurface.withOpacity(0.3),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '설정된 알람이 없어요.\n+ 버튼을 눌러보세요!',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: alarmList.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            return AlarmItemCard(
+                              alarm: alarmList[index],
+                              onToggle: (value) => _toggleAlarm(alarmList[index]),
+                              onDelete: () => _deleteAlarm(alarmList[index]),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
 
-class AlarmItem {
-  final String id;
-  final DateTime time;
-  final String content;
-  bool isActive;
-
-  AlarmItem({
-    required this.id,
-    required this.time,
-    required this.content,
-    required this.isActive,
-  });
-}
-
 class AlarmItemCard extends StatelessWidget {
   final AlarmItem alarm;
-  final ValueChanged<bool> onToggle;
+  final VoidCallback onToggle;
   final VoidCallback onDelete;
 
   const AlarmItemCard({
@@ -308,11 +335,34 @@ class AlarmItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final timeFormat = DateFormat('HH:mm');
+    final dateFormat = DateFormat('M월 d일 (E)', 'ko');
 
     return Dismissible(
       key: Key(alarm.id),
       direction: DismissDirection.endToStart,
       onDismissed: (_) => onDelete(),
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('알람 삭제'),
+            content: Text('\'${alarm.content}\' 알람을 삭제하시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: theme.colorScheme.error,
+                ),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+        );
+      },
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
@@ -345,7 +395,7 @@ class AlarmItemCard extends StatelessWidget {
                   children: [
                     Text(
                       timeFormat.format(alarm.time),
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: alarm.isActive
                             ? theme.colorScheme.primary
@@ -361,12 +411,19 @@ class AlarmItemCard extends StatelessWidget {
                             : theme.colorScheme.onSurface.withOpacity(0.5),
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '매일 반복',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                      ),
+                    ),
                   ],
                 ),
               ),
               Switch(
                 value: alarm.isActive,
-                onChanged: onToggle,
+                onChanged: (_) => onToggle(),
               ),
             ],
           ),
