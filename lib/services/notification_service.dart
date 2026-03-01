@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:convert';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -11,7 +12,14 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  Future<void> initialize() async {
+  // 알림 클릭 콜백 (외부에서 설정 가능)
+  Function(String alarmId, String action)? onNotificationTapped;
+
+  Future<void> initialize({
+    Function(String alarmId, String action)? onNotificationTapped,
+  }) async {
+    this.onNotificationTapped = onNotificationTapped;
+
     // 타임존 초기화
     tz.initializeTimeZones();
 
@@ -32,14 +40,31 @@ class NotificationService {
 
     await _notifications.initialize(
       initSettings,
-      onDidReceiveNotificationResponse: (details) {
-        // 알림 클릭 시 처리
-        print('Notification clicked: ${details.payload}');
-      },
+      onDidReceiveNotificationResponse: _handleNotificationResponse,
     );
 
     // 알림 채널 생성 (Android 8.0 이상)
     await _createNotificationChannel();
+  }
+
+  void _handleNotificationResponse(NotificationResponse response) {
+    final payload = response.payload;
+    final actionId = response.actionId;
+
+    if (payload != null && payload.isNotEmpty) {
+      try {
+        final data = jsonDecode(payload);
+        final alarmId = data['alarmId'] as String;
+        final action = actionId ?? 'open'; // 'open' 또는 'complete'
+
+        print('Notification response: alarmId=$alarmId, action=$action');
+
+        // 콜백 호출
+        onNotificationTapped?.call(alarmId, action);
+      } catch (e) {
+        print('Failed to parse notification payload: $e');
+      }
+    }
   }
 
   Future<void> _createNotificationChannel() async {
@@ -68,6 +93,7 @@ class NotificationService {
 
   Future<void> scheduleAlarm({
     required int id,
+    required String alarmId,
     required String title,
     required String content,
     required DateTime scheduledTime,
@@ -86,6 +112,21 @@ class NotificationService {
 
     final tzTime = tz.TZDateTime.from(targetTime, tz.local);
 
+    // Payload에 알람 ID 포함
+    final payload = jsonEncode({
+      'alarmId': alarmId,
+      'content': content,
+    });
+
+    // Android 알림 액션 버튼 정의
+    const completeAction = AndroidNotificationAction(
+      'complete',
+      '완료',
+      icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+      showsUserInterface: false,
+      cancelNotification: true,
+    );
+
     const androidDetails = AndroidNotificationDetails(
       'remindme_alarm_channel',
       '알람 알림',
@@ -95,22 +136,27 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       icon: '@mipmap/ic_launcher',
+      actions: [completeAction], // 완료 버튼 추가
+      category: AndroidNotificationCategory.alarm,
+      fullScreenIntent: true,
+      visibility: NotificationVisibility.public,
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      categoryIdentifier: 'alarmCategory',
     );
 
-    const notificationDetails = NotificationDetails(
+    final notificationDetails = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
 
     await _notifications.zonedSchedule(
       id,
-      '알람이 울립니다!',
+      '리마인드 알람!',
       content,
       tzTime,
       notificationDetails,
@@ -118,6 +164,7 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time, // 매일 반복
+      payload: payload,
     );
   }
 

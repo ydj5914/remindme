@@ -18,8 +18,22 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 알림 서비스 초기화
-  await NotificationService().initialize();
+  // 알림 서비스 초기화 (알림 클릭 콜백 포함)
+  await NotificationService().initialize(
+    onNotificationTapped: (alarmId, action) async {
+      print('Notification tapped: alarmId=$alarmId, action=$action');
+
+      // 익명 로그인이 되어있지 않으면 로그인 먼저
+      if (FirebaseAuth.instance.currentUser == null) {
+        await _signInAnonymously();
+      }
+
+      // 완료 버튼을 누르거나 알림을 클릭한 경우 알람 완료 처리
+      if (action == 'complete' || action == 'open') {
+        await AlarmService().completeAlarm(alarmId);
+      }
+    },
+  );
 
   // 익명 로그인 (사용자 인증)
   await _signInAnonymously();

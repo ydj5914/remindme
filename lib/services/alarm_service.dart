@@ -40,6 +40,7 @@ class AlarmService {
       // 2. 로컬 알람 스케줄링
       await _notificationService.scheduleAlarm(
         id: alarm.notificationId,
+        alarmId: docRef.id,
         title: 'Remind Me',
         content: content,
         scheduledTime: scheduledTime,
@@ -77,6 +78,7 @@ class AlarmService {
         // 활성화: 다시 스케줄링
         await _notificationService.scheduleAlarm(
           id: alarm.notificationId,
+          alarmId: alarm.id,
           title: 'Remind Me',
           content: alarm.content,
           scheduledTime: alarm.time,
@@ -87,6 +89,31 @@ class AlarmService {
       }
     } catch (e) {
       throw Exception('알람 토글 실패: $e');
+    }
+  }
+
+  /// 알람 완료 처리 (알림 클릭 시 호출)
+  Future<void> completeAlarm(String alarmId) async {
+    if (_userId == null) {
+      print('사용자가 로그인되어 있지 않습니다');
+      return;
+    }
+
+    try {
+      print('알람 완료 처리: $alarmId');
+
+      // 1. Firestore에서 isActive를 false로 변경
+      await _alarmsCollection.doc(alarmId).update({'isActive': false});
+
+      // 2. 해당 알람의 notification ID를 찾아서 로컬 알람 취소
+      final doc = await _alarmsCollection.doc(alarmId).get();
+      if (doc.exists) {
+        final alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+        await _notificationService.cancelAlarm(alarm.notificationId);
+        print('알람 완료: ${alarm.content}');
+      }
+    } catch (e) {
+      print('알람 완료 처리 실패: $e');
     }
   }
 
@@ -148,6 +175,7 @@ class AlarmService {
         try {
           await _notificationService.scheduleAlarm(
             id: alarm.notificationId,
+            alarmId: alarm.id,
             title: 'Remind Me',
             content: alarm.content,
             scheduledTime: alarm.time,
