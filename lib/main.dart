@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_screen.dart';
 import 'services/notification_service.dart';
 import 'services/alarm_service.dart';
 
@@ -28,9 +28,13 @@ void main() async {
         await _signInAnonymously();
       }
 
-      // 완료 버튼을 누르거나 알림을 클릭한 경우 알람 완료 처리
+      // 액션에 따라 처리
       if (action == 'complete' || action == 'open') {
+        // 완료 처리
         await AlarmService().completeAlarm(alarmId);
+      } else if (action == 'snooze') {
+        // 스누즈 처리
+        await AlarmService().snoozeAlarm(alarmId, minutes: 10);
       }
     },
   );
@@ -80,7 +84,7 @@ class RemindMeApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const RemindMeHomeScreen(),
+      home: const MainScreen(),
     );
   }
 }

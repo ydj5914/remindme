@@ -26,12 +26,28 @@ class AlarmService {
     required String content,
     required DateTime scheduledTime,
   }) async {
+    return addAlarmWithRepeat(
+      content: content,
+      scheduledTime: scheduledTime,
+      repeatType: RepeatType.daily,
+    );
+  }
+
+  /// 반복 옵션이 있는 알람 추가
+  Future<String> addAlarmWithRepeat({
+    required String content,
+    required DateTime scheduledTime,
+    required RepeatType repeatType,
+    List<int>? customDays,
+  }) async {
     try {
       final alarm = AlarmItem(
         id: '', // Firestore에서 자동 생성
         time: scheduledTime,
         content: content,
         isActive: true,
+        repeatType: repeatType,
+        customDays: customDays,
       );
 
       // 1. Firestore에 저장
@@ -102,18 +118,75 @@ class AlarmService {
     try {
       print('알람 완료 처리: $alarmId');
 
-      // 1. Firestore에서 isActive를 false로 변경
-      await _alarmsCollection.doc(alarmId).update({'isActive': false});
-
-      // 2. 해당 알람의 notification ID를 찾아서 로컬 알람 취소
       final doc = await _alarmsCollection.doc(alarmId).get();
-      if (doc.exists) {
-        final alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+      if (!doc.exists) return;
+
+      final alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+
+      // 1. 반복 타입에 따라 처리
+      if (alarm.repeatType == RepeatType.once) {
+        // 한 번만: isActive를 false로, completedAt 설정
+        await _alarmsCollection.doc(alarmId).update({
+          'isActive': false,
+          'completedAt': DateTime.now().millisecondsSinceEpoch,
+        });
         await _notificationService.cancelAlarm(alarm.notificationId);
-        print('알람 완료: ${alarm.content}');
+      } else {
+        // 반복: completedAt만 업데이트 (계속 울림)
+        await _alarmsCollection.doc(alarmId).update({
+          'completedAt': DateTime.now().millisecondsSinceEpoch,
+        });
       }
+
+      print('알람 완료: ${alarm.content}');
     } catch (e) {
       print('알람 완료 처리 실패: $e');
+    }
+  }
+
+  /// 완료된 알람 히스토리 가져오기
+  Stream<List<AlarmItem>> getHistoryStream() {
+    if (_userId == null) {
+      return Stream.value([]);
+    }
+
+    return _alarmsCollection
+        .where('completedAt', isNull: false)
+        .orderBy('completedAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+          .toList();
+    });
+  }
+
+  /// 히스토리에서 알람 삭제
+  Future<void> deleteHistory(AlarmItem alarm) async {
+    try {
+      await _alarmsCollection.doc(alarm.id).delete();
+    } catch (e) {
+      throw Exception('히스토리 삭제 실패: $e');
+    }
+  }
+
+  /// 모든 히스토리 삭제
+  Future<void> clearHistory() async {
+    if (_userId == null) return;
+
+    try {
+      final snapshot = await _alarmsCollection
+          .where('completedAt', isNull: false)
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception('히스토리 전체 삭제 실패: $e');
     }
   }
 
@@ -195,5 +268,39 @@ class AlarmService {
   /// 알람 동기화 (Firestore와 로컬 알람 일치시키기)
   Future<void> syncAlarms() async {
     await restoreAlarmsAfterReboot();
+  }
+
+  /// 스누즈 처리
+  Future<void> snoozeAlarm(String alarmId, {int minutes = 10}) async {
+    if (_userId == null) {
+      print('사용자가 로그인되어 있지 않습니다');
+      return;
+    }
+
+    try {
+      print('스누즈 처리: $alarmId ($minutes분)');
+
+      final doc = await _alarmsCollection.doc(alarmId).get();
+      if (!doc.exists) return;
+
+      final alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+
+      // 1. Firestore에서 스누즈 카운트 증가
+      await _alarmsCollection.doc(alarmId).update({
+        'snoozeCount': alarm.snoozeCount + 1,
+      });
+
+      // 2. 스누즈 알람 스케줄링
+      await _notificationService.snoozeAlarm(
+        id: alarm.notificationId,
+        alarmId: alarmId,
+        content: alarm.content,
+        snoozeMinutes: minutes,
+      );
+
+      print('스누즈 완료: ${alarm.content} (${minutes}분 후)');
+    } catch (e) {
+      print('스누즈 처리 실패: $e');
+    }
   }
 }

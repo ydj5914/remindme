@@ -127,6 +127,14 @@ class NotificationService {
       cancelNotification: true,
     );
 
+    const snoozeAction = AndroidNotificationAction(
+      'snooze',
+      '10분 후',
+      icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+      showsUserInterface: false,
+      cancelNotification: true,
+    );
+
     const androidDetails = AndroidNotificationDetails(
       'remindme_alarm_channel',
       '알람 알림',
@@ -136,7 +144,7 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
       icon: '@mipmap/ic_launcher',
-      actions: [completeAction], // 완료 버튼 추가
+      actions: [completeAction, snoozeAction], // 완료, 스누즈 버튼 추가
       category: AndroidNotificationCategory.alarm,
       fullScreenIntent: true,
       visibility: NotificationVisibility.public,
@@ -178,5 +186,80 @@ class NotificationService {
 
   Future<List<PendingNotificationRequest>> getPendingAlarms() async {
     return await _notifications.pendingNotificationRequests();
+  }
+
+  /// 스누즈 알람 (지정된 시간 후 다시 알림)
+  Future<void> snoozeAlarm({
+    required int id,
+    required String alarmId,
+    required String content,
+    int snoozeMinutes = 10,
+  }) async {
+    try {
+      final snoozeTime = DateTime.now().add(Duration(minutes: snoozeMinutes));
+      final tzTime = tz.TZDateTime.from(snoozeTime, tz.local);
+
+      final payload = jsonEncode({
+        'alarmId': alarmId,
+        'content': content,
+      });
+
+      const completeAction = AndroidNotificationAction(
+        'complete',
+        '완료',
+        showsUserInterface: false,
+        cancelNotification: true,
+      );
+
+      const snoozeAgainAction = AndroidNotificationAction(
+        'snooze',
+        '다시 10분',
+        showsUserInterface: false,
+        cancelNotification: true,
+      );
+
+      const androidDetails = AndroidNotificationDetails(
+        'remindme_alarm_channel',
+        '알람 알림',
+        channelDescription: 'RemindMe 알람 알림을 위한 채널',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        icon: '@mipmap/ic_launcher',
+        actions: [completeAction, snoozeAgainAction],
+        category: AndroidNotificationCategory.alarm,
+        fullScreenIntent: true,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        categoryIdentifier: 'alarmCategory',
+      );
+
+      const notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.zonedSchedule(
+        id + 100000, // 다른 ID 사용 (충돌 방지)
+        '스누즈 알람',
+        content,
+        tzTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
+
+      print('스누즈 설정: ${snoozeMinutes}분 후 ($snoozeTime)');
+    } catch (e) {
+      print('스누즈 설정 실패: $e');
+      rethrow;
+    }
   }
 }

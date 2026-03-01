@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/alarm_item.dart';
 import '../services/alarm_service.dart';
+import '../widgets/add_alarm_dialog.dart';
 
 class RemindMeHomeScreen extends StatefulWidget {
   const RemindMeHomeScreen({super.key});
@@ -14,6 +15,13 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
   final AlarmService _alarmService = AlarmService();
 
   Future<void> _showAddAlarmDialog() async {
+    await showDialog(
+      context: context,
+      builder: (context) => const AddAlarmDialog(),
+    );
+  }
+
+  Future<void> _showOldAddAlarmDialog() async {
     String alarmContent = '';
     TimeOfDay? selectedTime;
 
@@ -413,7 +421,7 @@ class AlarmItemCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '매일 반복',
+                      alarm.repeatLabel,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurface.withOpacity(0.4),
                       ),
