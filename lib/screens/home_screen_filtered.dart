@@ -226,8 +226,7 @@ class _RemindMeHomeScreenFilteredState
                         itemBuilder: (context, index) {
                           return AlarmItemCard(
                             alarm: filteredAlarms[index],
-                            onToggle: (value) =>
-                                _toggleAlarm(filteredAlarms[index]),
+                            onToggle: () => _toggleAlarm(filteredAlarms[index]),
                             onDelete: () => _deleteAlarm(filteredAlarms[index]),
                           );
                         },

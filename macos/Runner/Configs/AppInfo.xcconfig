@@ -8,7 +8,7 @@
 PRODUCT_NAME = remindme
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.remindme.remindme
+PRODUCT_BUNDLE_IDENTIFIER = com.roha4885.remindme
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.remindme. All rights reserved.

@@ -17,6 +17,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
 version: 1.0.0+1
+#ex) remindme_alpha_v1.0.02
 
 environment:
   sdk: ^3.11.0
@@ -53,7 +54,7 @@ dependencies:
 
   # Audio
   audioplayers: ^6.1.0
-  record: ^5.1.2
+  record: ^6.0.0
   path_provider: ^2.1.5
 
   # Charts

@@ -65,6 +65,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'remindme-b2ae5.firebasestorage.app',
     iosClientId:
         '919865008277-h1n0t4i6oam1nf79bl509ibuus7f45oe.apps.googleusercontent.com',
-    iosBundleId: 'com.remindme.remindme',
+    iosBundleId: 'com.roha4885.remindme',
   );
 }

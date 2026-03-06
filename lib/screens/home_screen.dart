@@ -307,8 +307,7 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                           itemBuilder: (context, index) {
                             return AlarmItemCard(
                               alarm: alarmList[index],
-                              onToggle: (value) =>
-                                  _toggleAlarm(alarmList[index]),
+                              onToggle: () => _toggleAlarm(alarmList[index]),
                               onDelete: () => _deleteAlarm(alarmList[index]),
                             );
                           },
