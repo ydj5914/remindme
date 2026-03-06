@@ -39,8 +39,10 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
               FilledButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  );
                 },
                 child: const Text('Sign In'),
               ),
@@ -184,13 +186,13 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('알람이 삭제되었습니다')));
+        ).showSnackBar(const SnackBar(content: Text('Alarm deleted')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('알람 삭제 실패: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
       }
     }
   }
@@ -202,7 +204,7 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('알람 토글 실패: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to toggle: $e')));
       }
     }
   }
@@ -229,7 +231,13 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
               const Text('Guest mode', style: TextStyle(fontSize: 14))
             else ...[
               if (user?.displayName != null)
-                Text(user!.displayName!, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                Text(
+                  user!.displayName!,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               if (user?.email != null)
                 Text(user!.email!, style: const TextStyle(fontSize: 13)),
             ],
@@ -291,7 +299,10 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                   }
                 }
               },
-              child: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'Delete Account',
+                style: TextStyle(color: Colors.red),
+              ),
             ),
         ],
       ),
@@ -322,15 +333,15 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
             onPressed: () async {
               await _alarmService.syncAlarms();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Alarms synced')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Alarms synced')));
               }
             },
           ),
           IconButton(
             icon: const Icon(Icons.account_circle),
-            tooltip: '계정',
+            tooltip: 'Account',
             onPressed: () => _showAccountDialog(),
           ),
         ],
@@ -349,7 +360,10 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                 children: [
                   Icon(Icons.error_outline, size: 64, color: colorScheme.error),
                   const SizedBox(height: 16),
-                  Text('오류가 발생했습니다', style: theme.textTheme.titleLarge),
+                  Text(
+                    'Something went wrong',
+                    style: theme.textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     '${snapshot.error}',
@@ -444,7 +458,11 @@ class _QuickStartSection extends StatelessWidget {
   static const _suggestions = [
     (icon: Icons.wb_sunny_outlined, label: 'Wake up', color: Color(0xFFFFA726)),
     (icon: Icons.self_improvement, label: 'Meditate', color: Color(0xFF7C3AED)),
-    (icon: Icons.water_drop_outlined, label: 'Drink Water', color: Color(0xFF29B6F6)),
+    (
+      icon: Icons.water_drop_outlined,
+      label: 'Drink Water',
+      color: Color(0xFF29B6F6),
+    ),
     (icon: Icons.fitness_center, label: 'Exercise', color: Color(0xFF26A69A)),
     (icon: Icons.menu_book_outlined, label: 'Read', color: Color(0xFFEC407A)),
     (icon: Icons.bedtime_outlined, label: 'Sleep', color: Color(0xFF5C6BC0)),
@@ -487,7 +505,10 @@ class _QuickStartSection extends StatelessWidget {
                 onTap: () => onTap(s.label),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: s.color.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(12),
@@ -614,7 +635,10 @@ class AlarmItemCard extends StatelessWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: categoryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -626,6 +650,37 @@ class AlarmItemCard extends StatelessWidget {
                               color: categoryColor,
                               fontWeight: FontWeight.w500,
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // Mode badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: alarm.modeColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                alarm.modeIcon,
+                                size: 9,
+                                color: alarm.modeColor,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                alarm.modeLabel,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: alarm.modeColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 6),

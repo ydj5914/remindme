@@ -25,7 +25,7 @@ class CategoryFilter extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
-              label: const Text('전체'),
+              label: const Text('All'),
               selected: selectedCategory == null,
               onSelected: (_) => onCategoryChanged(null),
               avatar: selectedCategory == null

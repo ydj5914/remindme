@@ -91,7 +91,7 @@ class _VoiceMemoRecorderState extends State<VoiceMemoRecorder> {
               children: [
                 Icon(Icons.mic, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('음성 메모', style: theme.textTheme.titleMedium),
+                Text('Voice Memo', style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 16),
@@ -153,7 +153,7 @@ class _VoiceMemoRecorderState extends State<VoiceMemoRecorder> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '녹음 중...',
+                    'Recording...',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.error,
                     ),
@@ -162,14 +162,14 @@ class _VoiceMemoRecorderState extends State<VoiceMemoRecorder> {
               ),
             if (_uploadedUrl != null)
               Text(
-                '✓ 업로드 완료',
+                '✓ Saved',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
               ),
             if (_recordedPath != null && _uploadedUrl == null)
               Text(
-                '업로드 중...',
+                'Uploading...',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.secondary,
                 ),

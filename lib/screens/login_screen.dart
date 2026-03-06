@@ -52,9 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign in failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Sign in failed: $e')));
       }
       setState(() => _isLoading = false);
     }
@@ -105,13 +105,14 @@ class _LoginScreenState extends State<LoginScreen> {
           : null,
       body: SafeArea(
         top: !canPop,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 40),
+              Center(
+                child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer.withOpacity(0.3),
@@ -123,46 +124,49 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: theme.colorScheme.primary,
                   ),
                 ),
-                const SizedBox(height: 32),
-                Text(
-                  'Remind Me',
-                  style: theme.textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              ),
+              const SizedBox(height: 32),
+              Text(
+                'Remind Me',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Your routines, elevated.',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.5),
-                  ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your routines, elevated.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.5),
                 ),
-                const SizedBox(height: 64),
-                if (_isLoading)
-                  const CircularProgressIndicator()
-                else
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: _signInWithGoogle,
-                      icon: const Icon(Icons.login),
-                      label: const Text(
-                        'Continue with Google',
-                        style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 48),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: _signInWithGoogle,
+                    icon: const Icon(Icons.login),
+                    label: const Text(
+                      'Continue with Google',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(
-                          color: theme.colorScheme.primary.withOpacity(0.5),
-                        ),
+                      side: BorderSide(
+                        color: theme.colorScheme.primary.withOpacity(0.5),
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+              const SizedBox(height: 40),
+            ],
           ),
         ),
       ),

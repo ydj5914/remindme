@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+/// The three signature alarm modes.
+enum AlarmMode {
+  chaos, // Hard awakening – tap-to-pop targets game
+  mood, // Aesthetic vibe – liquid gradient + swipe to dismiss
+  ghost, // Stress-free   – silent sticky notification
+}
+
 enum RepeatType {
   once, // 한 번만
   daily, // 매일
@@ -37,6 +44,7 @@ class AlarmItem {
   final AlarmSound sound; // 알람 소리
   final String? voiceMemoPath; // 음성 메모 경로
   final String? note; // 히스토리 메모/이모지
+  final AlarmMode mode; // 알람 모드
 
   AlarmItem({
     required this.id,
@@ -52,6 +60,7 @@ class AlarmItem {
     this.sound = AlarmSound.defaultSound,
     this.voiceMemoPath,
     this.note,
+    this.mode = AlarmMode.chaos,
   }) : createdAt = createdAt ?? DateTime.now();
 
   // Firestore로부터 데이터 읽기
@@ -85,6 +94,10 @@ class AlarmItem {
       ),
       voiceMemoPath: data['voiceMemoPath'] as String?,
       note: data['note'] as String?,
+      mode: AlarmMode.values.firstWhere(
+        (e) => e.name == (data['mode'] as String?),
+        orElse: () => AlarmMode.chaos,
+      ),
     );
   }
 
@@ -105,6 +118,7 @@ class AlarmItem {
       'sound': sound.name,
       'voiceMemoPath': voiceMemoPath,
       'note': note,
+      'mode': mode.name,
     };
   }
 
@@ -122,6 +136,7 @@ class AlarmItem {
     AlarmSound? sound,
     String? voiceMemoPath,
     String? note,
+    AlarmMode? mode,
   }) {
     return AlarmItem(
       id: id ?? this.id,
@@ -137,6 +152,7 @@ class AlarmItem {
       sound: sound ?? this.sound,
       voiceMemoPath: voiceMemoPath ?? this.voiceMemoPath,
       note: note ?? this.note,
+      mode: mode ?? this.mode,
     );
   }
 
@@ -208,15 +224,48 @@ class AlarmItem {
   String get soundLabel {
     switch (sound) {
       case AlarmSound.defaultSound:
-        return '기본';
+        return 'Default';
       case AlarmSound.gentle:
-        return '부드러운';
+        return 'Gentle';
       case AlarmSound.classic:
-        return '클래식';
+        return 'Classic';
       case AlarmSound.digital:
-        return '디지털';
+        return 'Digital';
       case AlarmSound.nature:
-        return '자연';
+        return 'Nature';
+    }
+  }
+
+  String get modeLabel {
+    switch (mode) {
+      case AlarmMode.chaos:
+        return 'Chaos';
+      case AlarmMode.mood:
+        return 'Mood';
+      case AlarmMode.ghost:
+        return 'Ghost';
+    }
+  }
+
+  IconData get modeIcon {
+    switch (mode) {
+      case AlarmMode.chaos:
+        return Icons.bolt;
+      case AlarmMode.mood:
+        return Icons.auto_awesome;
+      case AlarmMode.ghost:
+        return Icons.nightlight_round;
+    }
+  }
+
+  Color get modeColor {
+    switch (mode) {
+      case AlarmMode.chaos:
+        return const Color(0xFFCC2233);
+      case AlarmMode.mood:
+        return const Color(0xFF7C3AED);
+      case AlarmMode.ghost:
+        return const Color(0xFF546E7A);
     }
   }
 

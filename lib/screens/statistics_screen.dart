@@ -87,7 +87,12 @@ class StatisticsScreen extends StatelessWidget {
                 const SizedBox(height: 32),
 
                 // 30-day Heatmap
-                Text('30-Day Activity', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  '30-Day Activity',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   'Color intensity = completions per day',
@@ -96,17 +101,29 @@ class StatisticsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _HeatmapGrid(history: history, baseColor: theme.colorScheme.primary),
+                _HeatmapGrid(
+                  history: history,
+                  baseColor: theme.colorScheme.primary,
+                ),
 
                 const SizedBox(height: 32),
 
                 // Category breakdown
-                Text('By Category', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'By Category',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 if (history.isEmpty)
                   Center(
-                    child: Text('No data yet',
-                        style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.3))),
+                    child: Text(
+                      'No data yet',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface.withOpacity(0.3),
+                      ),
+                    ),
                   )
                 else
                   SizedBox(
@@ -117,7 +134,12 @@ class StatisticsScreen extends StatelessWidget {
                 const SizedBox(height: 32),
 
                 // Weekly bar chart
-                Text('Weekly Trend', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Weekly Trend',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(height: 180, child: _WeeklyBarChart(history: history)),
               ],
@@ -144,8 +166,7 @@ class StatisticsScreen extends StatelessWidget {
         .where((a) => a.completedAt != null && a.completedAt!.isAfter(weekAgo))
         .length;
 
-    final totalSnooze =
-        history.fold<int>(0, (sum, a) => sum + a.snoozeCount);
+    final totalSnooze = history.fold<int>(0, (sum, a) => sum + a.snoozeCount);
     final avgSnooze = (totalSnooze / history.length).toStringAsFixed(1);
 
     // Best weekday
@@ -182,12 +203,16 @@ class _AnalysisBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = weekTotal > 0 ? (weekCount / weekTotal * 100).round() : 0;
-    final emoji = pct >= 80 ? '🚀' : pct >= 50 ? '💪' : '🌱';
+    final emoji = pct >= 80
+        ? '🚀'
+        : pct >= 50
+        ? '💪'
+        : '🌱';
     final msg = pct >= 80
         ? "You're crushing it!"
         : pct >= 50
-            ? "Keep the momentum going!"
-            : "Every streak starts with one.";
+        ? "Keep the momentum going!"
+        : "Every streak starts with one.";
 
     return Container(
       width: double.infinity,
@@ -200,9 +225,7 @@ class _AnalysisBanner extends StatelessWidget {
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.primary.withOpacity(0.3),
-        ),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,20 +284,20 @@ class _HeatmapGrid extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(DateFormat('MMM d').format(days.first),
-                style: TextStyle(
-                    fontSize: 10,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.4))),
-            Text(DateFormat('MMM d').format(days.last),
-                style: TextStyle(
-                    fontSize: 10,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.4))),
+            Text(
+              DateFormat('MMM d').format(days.first),
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+              ),
+            ),
+            Text(
+              DateFormat('MMM d').format(days.last),
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -293,10 +316,9 @@ class _HeatmapGrid extends StatelessWidget {
                 height: 28,
                 decoration: BoxDecoration(
                   color: count == 0
-                      ? Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.07)
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.07)
                       : baseColor.withOpacity(0.2 + intensity * 0.8),
                   borderRadius: BorderRadius.circular(5),
                 ),
@@ -308,13 +330,13 @@ class _HeatmapGrid extends StatelessWidget {
         // Legend
         Row(
           children: [
-            Text('Less  ',
-                style: TextStyle(
-                    fontSize: 10,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.4))),
+            Text(
+              'Less  ',
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+              ),
+            ),
             ...List.generate(
               5,
               (i) => Container(
@@ -323,22 +345,21 @@ class _HeatmapGrid extends StatelessWidget {
                 margin: const EdgeInsets.only(right: 3),
                 decoration: BoxDecoration(
                   color: i == 0
-                      ? Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.07)
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.07)
                       : baseColor.withOpacity(0.2 + (i / 4) * 0.8),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
             ),
-            Text('  More',
-                style: TextStyle(
-                    fontSize: 10,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.4))),
+            Text(
+              '  More',
+              style: TextStyle(
+                fontSize: 10,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+              ),
+            ),
           ],
         ),
       ],
@@ -372,18 +393,17 @@ class _StatCard extends StatelessWidget {
             Text(
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
             Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.55),
-                  ),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withOpacity(0.55),
+              ),
             ),
           ],
         ),
@@ -421,7 +441,10 @@ class _CategoryPieChart extends StatelessWidget {
             ).categoryColor,
             radius: 50,
             titleStyle: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           );
         }).toList(),
         sectionsSpace: 2,
@@ -464,19 +487,23 @@ class _WeeklyBarChart extends StatelessWidget {
                   end: Alignment.topCenter,
                 ),
                 width: 18,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(4)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(4),
+                ),
               ),
             ],
           );
         }),
         titlesData: FlTitlesData(
-          leftTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -484,10 +511,9 @@ class _WeeklyBarChart extends StatelessWidget {
                 weekdays[value.toInt()],
                 style: TextStyle(
                   fontSize: 11,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withOpacity(0.5),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.5),
                 ),
               ),
             ),

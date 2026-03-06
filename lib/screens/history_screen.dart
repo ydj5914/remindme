@@ -157,9 +157,9 @@ class _TimelineItemState extends State<_TimelineItem> {
           children: [
             Text(
               'Add a note',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
@@ -173,13 +173,15 @@ class _TimelineItemState extends State<_TimelineItem> {
             Wrap(
               spacing: 8,
               children: ['🎯', '✅', '💪', '🌟', '😴', '🏃', '💧', '📖']
-                  .map((e) => GestureDetector(
-                        onTap: () {
-                          controller.text = e;
-                          note = e;
-                        },
-                        child: Text(e, style: const TextStyle(fontSize: 28)),
-                      ))
+                  .map(
+                    (e) => GestureDetector(
+                      onTap: () {
+                        controller.text = e;
+                        note = e;
+                      },
+                      child: Text(e, style: const TextStyle(fontSize: 28)),
+                    ),
+                  )
                   .toList(),
             ),
             const SizedBox(height: 12),
@@ -270,7 +272,9 @@ class _TimelineItemState extends State<_TimelineItem> {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
-                      border: widget.alarm.note != null && widget.alarm.note!.isNotEmpty
+                      border:
+                          widget.alarm.note != null &&
+                              widget.alarm.note!.isNotEmpty
                           ? Border.all(color: categoryColor.withOpacity(0.4))
                           : null,
                     ),
@@ -279,8 +283,11 @@ class _TimelineItemState extends State<_TimelineItem> {
                       children: [
                         Row(
                           children: [
-                            Icon(widget.alarm.categoryIcon,
-                                size: 14, color: categoryColor),
+                            Icon(
+                              widget.alarm.categoryIcon,
+                              size: 14,
+                              color: categoryColor,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               widget.alarm.content,
@@ -303,15 +310,20 @@ class _TimelineItemState extends State<_TimelineItem> {
                           Text(
                             'Completed ${dateFormat.format(widget.alarm.completedAt!)} at ${timeFormat.format(widget.alarm.completedAt!)}',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.4),
+                              color: theme.colorScheme.onSurface.withOpacity(
+                                0.4,
+                              ),
                             ),
                           ),
                         ],
-                        if (widget.alarm.note != null && widget.alarm.note!.isNotEmpty) ...[
+                        if (widget.alarm.note != null &&
+                            widget.alarm.note!.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: categoryColor.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(8),
@@ -328,7 +340,9 @@ class _TimelineItemState extends State<_TimelineItem> {
                           Text(
                             'Tap to add note ✏️',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.25),
+                              color: theme.colorScheme.onSurface.withOpacity(
+                                0.25,
+                              ),
                               fontSize: 11,
                             ),
                           ),

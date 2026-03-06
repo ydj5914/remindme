@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/alarm_item.dart';
 import 'notification_service.dart';
+import 'settings_service.dart';
+import 'widget_service.dart';
 
 class AlarmService {
   static final AlarmService _instance = AlarmService._internal();
@@ -12,277 +17,322 @@ class AlarmService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notificationService = NotificationService();
 
+  // Local stream controller for guest mode
+  final _localAlarmsController = StreamController<List<AlarmItem>>.broadcast();
+  final _localHistoryController = StreamController<List<AlarmItem>>.broadcast();
+
+  static const _localAlarmsKey = 'local_alarms';
+  static const _permissionAskedKey = 'permission_asked';
+
   String? get _userId => _auth.currentUser?.uid;
 
+  /// Guest = no user, anonymous user, OR any state where we can't reach Firestore.
+  bool get _isGuest {
+    final user = _auth.currentUser;
+    if (user == null) return true;
+    if (user.isAnonymous) return true;
+    // If uid exists but no network, we still treat as guest to avoid crashes.
+    return false;
+  }
+
   CollectionReference get _alarmsCollection {
-    if (_userId == null) {
-      throw Exception('사용자가 로그인되어 있지 않습니다');
-    }
+    if (_userId == null) throw Exception('Not signed in');
     return _firestore.collection('users').doc(_userId).collection('alarms');
   }
 
-  /// Firestore에 알람 저장 + 로컬 알람 스케줄링
+  // ─── Permission ───────────────────────────────────────────────────────────
+
+  /// Request permission on first alarm creation.
+  Future<void> _requestPermissionIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final asked = prefs.getBool(_permissionAskedKey) ?? false;
+    if (!asked) {
+      await _notificationService.requestPermissions();
+      await prefs.setBool(_permissionAskedKey, true);
+    }
+  }
+
+  // ─── Local Storage helpers ────────────────────────────────────────────────
+
+  Future<List<AlarmItem>> _loadLocalAlarms() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_localAlarmsKey) ?? [];
+    return raw.map((s) {
+      final map = jsonDecode(s) as Map<String, dynamic>;
+      return AlarmItem.fromMap(map['id'] as String, map);
+    }).toList();
+  }
+
+  Future<void> _saveLocalAlarms(List<AlarmItem> alarms) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = alarms.map((a) {
+      final map = a.toMap();
+      map['id'] = a.id;
+      return jsonEncode(map);
+    }).toList();
+    await prefs.setStringList(_localAlarmsKey, raw);
+    // Push to local stream
+    final active = alarms.where((a) => a.completedAt == null).toList();
+    final history = alarms.where((a) => a.completedAt != null).toList();
+    _localAlarmsController.add(active);
+    _localHistoryController.add(history);
+  }
+
+  String _generateLocalId() => 'local_${DateTime.now().millisecondsSinceEpoch}';
+
+  // ─── Add Alarm ─────────────────────────────────────────────────────────────
+
   Future<String> addAlarm({
     required String content,
     required DateTime scheduledTime,
-  }) async {
-    return addAlarmWithRepeat(
-      content: content,
-      scheduledTime: scheduledTime,
-      repeatType: RepeatType.daily,
-    );
-  }
+  }) => addAlarmWithRepeat(
+    content: content,
+    scheduledTime: scheduledTime,
+    repeatType: RepeatType.daily,
+  );
 
-  /// 반복 옵션이 있는 알람 추가
   Future<String> addAlarmWithRepeat({
     required String content,
     required DateTime scheduledTime,
     required RepeatType repeatType,
     List<int>? customDays,
+    AlarmSoundOption sound = AlarmSoundOption.defaultSound,
+    AlarmMode mode = AlarmMode.chaos,
   }) async {
-    try {
-      final alarm = AlarmItem(
-        id: '', // Firestore에서 자동 생성
-        time: scheduledTime,
-        content: content,
-        isActive: true,
-        repeatType: repeatType,
-        customDays: customDays,
-      );
+    // Request notification permission on first alarm
+    await _requestPermissionIfNeeded();
 
-      // 1. Firestore에 저장
-      final docRef = await _alarmsCollection.add(alarm.toMap());
+    final alarm = AlarmItem(
+      id: '',
+      time: scheduledTime,
+      content: content,
+      isActive: true,
+      repeatType: repeatType,
+      customDays: customDays,
+      mode: mode,
+    );
 
-      // 2. 로컬 알람 스케줄링
+    String docId;
+
+    if (_isGuest) {
+      // ── Guest: store locally ──────────────────────────────────────────
+      docId = _generateLocalId();
+      final alarmWithId = alarm.copyWith(id: docId);
+      final all = await _loadLocalAlarms();
+      all.add(alarmWithId);
+      await _saveLocalAlarms(all);
+    } else {
+      // ── Logged-in: store in Firestore ─────────────────────────────────
+      final ref = await _alarmsCollection.add(alarm.toMap());
+      docId = ref.id;
+    }
+
+    // Schedule local notification (works for both modes)
+    await _notificationService.scheduleAlarm(
+      id: scheduledTime.millisecondsSinceEpoch ~/ 1000,
+      alarmId: docId,
+      title: 'Remind Me',
+      content: content,
+      scheduledTime: scheduledTime,
+      repeatType: repeatType,
+      customDays: customDays,
+      sound: sound,
+      mode: mode,
+    );
+
+    // Refresh home widget
+    unawaited(WidgetService().updateWidget());
+
+    return docId;
+  }
+
+  // ─── Delete ────────────────────────────────────────────────────────────────
+
+  Future<void> deleteAlarm(AlarmItem alarm) async {
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      all.removeWhere((a) => a.id == alarm.id);
+      await _saveLocalAlarms(all);
+    } else {
+      await _alarmsCollection.doc(alarm.id).delete();
+    }
+    await _notificationService.cancelAlarm(alarm.notificationId);
+  }
+
+  // ─── Toggle ────────────────────────────────────────────────────────────────
+
+  Future<void> toggleAlarm(AlarmItem alarm) async {
+    final newStatus = !alarm.isActive;
+
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      final idx = all.indexWhere((a) => a.id == alarm.id);
+      if (idx != -1) {
+        all[idx] = alarm.copyWith(isActive: newStatus);
+        await _saveLocalAlarms(all);
+      }
+    } else {
+      await _alarmsCollection.doc(alarm.id).update({'isActive': newStatus});
+    }
+
+    if (newStatus) {
       await _notificationService.scheduleAlarm(
         id: alarm.notificationId,
-        alarmId: docRef.id,
+        alarmId: alarm.id,
         title: 'Remind Me',
-        content: content,
-        scheduledTime: scheduledTime,
+        content: alarm.content,
+        scheduledTime: alarm.time,
+        repeatType: alarm.repeatType,
+        customDays: alarm.customDays,
+        mode: alarm.mode,
       );
-
-      return docRef.id;
-    } catch (e) {
-      throw Exception('알람 추가 실패: $e');
-    }
-  }
-
-  /// 알람 삭제 (Firestore + 로컬)
-  Future<void> deleteAlarm(AlarmItem alarm) async {
-    try {
-      // 1. Firestore에서 삭제
-      await _alarmsCollection.doc(alarm.id).delete();
-
-      // 2. 로컬 알람 취소
+    } else {
       await _notificationService.cancelAlarm(alarm.notificationId);
-    } catch (e) {
-      throw Exception('알람 삭제 실패: $e');
     }
   }
 
-  /// 알람 활성/비활성 토글
-  Future<void> toggleAlarm(AlarmItem alarm) async {
-    try {
-      final newStatus = !alarm.isActive;
+  // ─── Complete ─────────────────────────────────────────────────────────────
 
-      // 1. Firestore 업데이트
-      await _alarmsCollection.doc(alarm.id).update({'isActive': newStatus});
-
-      // 2. 로컬 알람 처리
-      if (newStatus) {
-        // 활성화: 다시 스케줄링
-        await _notificationService.scheduleAlarm(
-          id: alarm.notificationId,
-          alarmId: alarm.id,
-          title: 'Remind Me',
-          content: alarm.content,
-          scheduledTime: alarm.time,
-        );
-      } else {
-        // 비활성화: 취소
-        await _notificationService.cancelAlarm(alarm.notificationId);
-      }
-    } catch (e) {
-      throw Exception('알람 토글 실패: $e');
-    }
-  }
-
-  /// 알람 완료 처리 (알림 클릭 시 호출)
   Future<void> completeAlarm(String alarmId) async {
-    if (_userId == null) {
-      print('사용자가 로그인되어 있지 않습니다');
-      return;
-    }
+    unawaited(WidgetService().updateWidget());
+    final now = DateTime.now().millisecondsSinceEpoch;
 
-    try {
-      print('알람 완료 처리: $alarmId');
-
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      final idx = all.indexWhere((a) => a.id == alarmId);
+      if (idx == -1) return;
+      final alarm = all[idx];
+      if (alarm.repeatType == RepeatType.once) {
+        all[idx] = alarm.copyWith(isActive: false, completedAt: DateTime.now());
+      } else {
+        all[idx] = alarm.copyWith(completedAt: DateTime.now());
+      }
+      await _saveLocalAlarms(all);
+    } else {
+      if (_userId == null) return;
       final doc = await _alarmsCollection.doc(alarmId).get();
       if (!doc.exists) return;
-
       final alarm = AlarmItem.fromMap(
         doc.id,
         doc.data() as Map<String, dynamic>,
       );
-
-      // 1. 반복 타입에 따라 처리
       if (alarm.repeatType == RepeatType.once) {
-        // 한 번만: isActive를 false로, completedAt 설정
         await _alarmsCollection.doc(alarmId).update({
           'isActive': false,
-          'completedAt': DateTime.now().millisecondsSinceEpoch,
+          'completedAt': now,
         });
         await _notificationService.cancelAlarm(alarm.notificationId);
       } else {
-        // 반복: completedAt만 업데이트 (계속 울림)
-        await _alarmsCollection.doc(alarmId).update({
-          'completedAt': DateTime.now().millisecondsSinceEpoch,
-        });
+        await _alarmsCollection.doc(alarmId).update({'completedAt': now});
       }
-
-      print('알람 완료: ${alarm.content}');
-    } catch (e) {
-      print('알람 완료 처리 실패: $e');
     }
   }
 
-  /// 완료된 알람 히스토리 가져오기
-  Stream<List<AlarmItem>> getHistoryStream() {
-    if (_userId == null) {
-      return Stream.value([]);
+  // ─── Streams ───────────────────────────────────────────────────────────────
+
+  Stream<List<AlarmItem>> getAlarmsStream() {
+    if (_isGuest) {
+      // Seed the stream with current data, then return the broadcast stream
+      _loadLocalAlarms().then((all) {
+        _localAlarmsController.add(
+          all.where((a) => a.completedAt == null).toList(),
+        );
+      });
+      return _localAlarmsController.stream;
     }
 
+    return _alarmsCollection
+        .where('completedAt', isNull: true)
+        .orderBy('timeMillis')
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(
+                (d) =>
+                    AlarmItem.fromMap(d.id, d.data() as Map<String, dynamic>),
+              )
+              .toList(),
+        );
+  }
+
+  Stream<List<AlarmItem>> getHistoryStream() {
+    if (_isGuest) {
+      _loadLocalAlarms().then((all) {
+        final history = all.where((a) => a.completedAt != null).toList()
+          ..sort(
+            (a, b) => (b.completedAt ?? DateTime(0)).compareTo(
+              a.completedAt ?? DateTime(0),
+            ),
+          );
+        _localHistoryController.add(history);
+      });
+      return _localHistoryController.stream;
+    }
+
+    if (_userId == null) return Stream.value([]);
     return _alarmsCollection
         .where('completedAt', isNull: false)
         .orderBy('completedAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
+        .map(
+          (s) => s.docs
               .map(
-                (doc) => AlarmItem.fromMap(
-                  doc.id,
-                  doc.data() as Map<String, dynamic>,
-                ),
+                (d) =>
+                    AlarmItem.fromMap(d.id, d.data() as Map<String, dynamic>),
               )
-              .toList();
-        });
+              .toList(),
+        );
   }
 
-  /// 히스토리에서 알람 삭제
+  // ─── History helpers ───────────────────────────────────────────────────────
+
   Future<void> deleteHistory(AlarmItem alarm) async {
-    try {
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      all.removeWhere((a) => a.id == alarm.id);
+      await _saveLocalAlarms(all);
+    } else {
       await _alarmsCollection.doc(alarm.id).delete();
-    } catch (e) {
-      throw Exception('히스토리 삭제 실패: $e');
     }
   }
 
-  /// 모든 히스토리 삭제
   Future<void> clearHistory() async {
-    if (_userId == null) return;
-
-    try {
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      all.removeWhere((a) => a.completedAt != null);
+      await _saveLocalAlarms(all);
+    } else {
+      if (_userId == null) return;
       final snapshot = await _alarmsCollection
           .where('completedAt', isNull: false)
           .get();
-
       final batch = _firestore.batch();
-      for (final doc in snapshot.docs) {
-        batch.delete(doc.reference);
-      }
+      for (final doc in snapshot.docs) batch.delete(doc.reference);
       await batch.commit();
-    } catch (e) {
-      throw Exception('히스토리 전체 삭제 실패: $e');
     }
   }
 
-  /// Firestore에서 모든 알람 가져오기 (실시간 스트림)
-  Stream<List<AlarmItem>> getAlarmsStream() {
-    if (_userId == null) {
-      return Stream.value([]);
-    }
-
-    return _alarmsCollection.orderBy('timeMillis').snapshots().map((snapshot) {
-      return snapshot.docs
-          .map(
-            (doc) =>
-                AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>),
-          )
-          .toList();
-    });
-  }
-
-  /// Firestore에서 활성화된 알람만 가져오기
-  Future<List<AlarmItem>> getActiveAlarms() async {
-    if (_userId == null) {
-      return [];
-    }
-
-    try {
-      final snapshot = await _alarmsCollection
-          .where('isActive', isEqualTo: true)
-          .get();
-
-      return snapshot.docs
-          .map(
-            (doc) =>
-                AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>),
-          )
-          .toList();
-    } catch (e) {
-      print('활성 알람 조회 실패: $e');
-      return [];
-    }
-  }
-
-  /// 재부팅 후 알람 복원 (앱 시작 시 호출)
-  Future<void> restoreAlarmsAfterReboot() async {
-    if (_userId == null) {
-      print('사용자가 로그인되어 있지 않아 알람을 복원할 수 없습니다');
-      return;
-    }
-
-    try {
-      print('알람 복원 시작...');
-
-      // 1. Firestore에서 활성화된 알람 목록 가져오기
-      final activeAlarms = await getActiveAlarms();
-      print('복원할 알람 ${activeAlarms.length}개 발견');
-
-      // 2. 로컬 알람 모두 취소 (중복 방지)
-      await _notificationService.cancelAllAlarms();
-
-      // 3. 각 알람을 다시 스케줄링
-      for (final alarm in activeAlarms) {
-        try {
-          await _notificationService.scheduleAlarm(
-            id: alarm.notificationId,
-            alarmId: alarm.id,
-            title: 'Remind Me',
-            content: alarm.content,
-            scheduledTime: alarm.time,
-          );
-          print('알람 복원 성공: ${alarm.content} at ${alarm.time}');
-        } catch (e) {
-          print('알람 복원 실패: ${alarm.content}, 오류: $e');
-        }
+  Future<void> updateHistoryNote(String alarmId, String note) async {
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      final idx = all.indexWhere((a) => a.id == alarmId);
+      if (idx != -1) {
+        all[idx] = all[idx].copyWith(note: note);
+        await _saveLocalAlarms(all);
       }
-
-      print('알람 복원 완료');
-    } catch (e) {
-      print('알람 복원 중 오류 발생: $e');
+    } else {
+      await _alarmsCollection.doc(alarmId).update({'note': note});
     }
   }
 
-  /// 알람 동기화 (Firestore와 로컬 알람 일치시키기)
-  Future<void> syncAlarms() async {
-    await restoreAlarmsAfterReboot();
-  }
+  // ─── Counts & queries ─────────────────────────────────────────────────────
 
-  /// 현재 알람 개수 조회
   Future<int> getAlarmCount() async {
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      return all.where((a) => a.completedAt == null).length;
+    }
     if (_userId == null) return 0;
     final snapshot = await _alarmsCollection
         .where('completedAt', isNull: true)
@@ -290,56 +340,157 @@ class AlarmService {
     return snapshot.docs.length;
   }
 
-  /// 히스토리 메모/이모지 업데이트
-  Future<void> updateHistoryNote(String alarmId, String note) async {
-    try {
-      await _alarmsCollection.doc(alarmId).update({'note': note});
-    } catch (e) {
-      throw Exception('Failed to update note: $e');
+  Future<List<AlarmItem>> getActiveAlarms() async {
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      return all.where((a) => a.isActive && a.completedAt == null).toList();
+    }
+    if (_userId == null) return [];
+    final snapshot = await _alarmsCollection
+        .where('isActive', isEqualTo: true)
+        .get();
+    return snapshot.docs
+        .map((d) => AlarmItem.fromMap(d.id, d.data() as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ─── Sync / Restore ───────────────────────────────────────────────────────
+
+  Future<void> restoreAlarmsAfterReboot() async {
+    final activeAlarms = await getActiveAlarms();
+    await _notificationService.cancelAllAlarms();
+    for (final alarm in activeAlarms) {
+      try {
+        await _notificationService.scheduleAlarm(
+          id: alarm.notificationId,
+          alarmId: alarm.id,
+          title: 'Remind Me',
+          content: alarm.content,
+          scheduledTime: alarm.time,
+          repeatType: alarm.repeatType,
+          customDays: alarm.customDays,
+          mode: alarm.mode,
+        );
+      } catch (_) {}
     }
   }
 
-  /// 익명 계정을 Google 계정으로 연결 (게스트 → 계정)
-  Future<void> linkWithGoogle(OAuthCredential credential) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    await user.linkWithCredential(credential);
-  }
+  Future<void> syncAlarms() => restoreAlarmsAfterReboot();
 
-  /// 스누즈 처리
   Future<void> snoozeAlarm(String alarmId, {int minutes = 10}) async {
-    if (_userId == null) {
-      print('사용자가 로그인되어 있지 않습니다');
-      return;
-    }
+    AlarmItem? alarm;
 
-    try {
-      print('스누즈 처리: $alarmId ($minutes분)');
-
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      alarm = all.cast<AlarmItem?>().firstWhere(
+        (a) => a?.id == alarmId,
+        orElse: () => null,
+      );
+    } else {
+      if (_userId == null) return;
       final doc = await _alarmsCollection.doc(alarmId).get();
       if (!doc.exists) return;
-
-      final alarm = AlarmItem.fromMap(
-        doc.id,
-        doc.data() as Map<String, dynamic>,
-      );
-
-      // 1. Firestore에서 스누즈 카운트 증가
+      alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
       await _alarmsCollection.doc(alarmId).update({
         'snoozeCount': alarm.snoozeCount + 1,
       });
-
-      // 2. 스누즈 알람 스케줄링
-      await _notificationService.snoozeAlarm(
-        id: alarm.notificationId,
-        alarmId: alarmId,
-        content: alarm.content,
-        snoozeMinutes: minutes,
-      );
-
-      print('스누즈 완료: ${alarm.content} (${minutes}분 후)');
-    } catch (e) {
-      print('스누즈 처리 실패: $e');
     }
+
+    if (alarm == null) return;
+    await _notificationService.snoozeAlarm(
+      id: alarm.notificationId,
+      alarmId: alarmId,
+      content: alarm.content,
+      snoozeMinutes: minutes,
+    );
+  }
+
+  // ─── Smart Snooze (escalating) ────────────────────────────────────────────
+
+  /// Call this when a Chaos alarm fires and the screen is shown.
+  /// Schedules escalating follow-up notifications in case the user ignores it.
+  Future<void> startEscalatingFollowUps(String alarmId) async {
+    AlarmItem? alarm;
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      alarm = all.cast<AlarmItem?>().firstWhere(
+        (a) => a?.id == alarmId,
+        orElse: () => null,
+      );
+    } else {
+      if (_userId == null) return;
+      final doc = await _alarmsCollection.doc(alarmId).get();
+      if (!doc.exists) return;
+      alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+    }
+    if (alarm == null) return;
+
+    final intense = await SettingsService().isChaosIntenseEnabled();
+    await _notificationService.scheduleEscalatingFollowUps(
+      baseId: alarm.notificationId,
+      alarmId: alarmId,
+      content: alarm.content,
+      intervalMinutes: intense ? 3 : 5,
+    );
+  }
+
+  /// Cancel escalating follow-ups (called when alarm is dismissed/completed).
+  Future<void> cancelEscalatingFollowUps(String alarmId) async {
+    AlarmItem? alarm;
+    if (_isGuest) {
+      final all = await _loadLocalAlarms();
+      alarm = all.cast<AlarmItem?>().firstWhere(
+        (a) => a?.id == alarmId,
+        orElse: () => null,
+      );
+    } else {
+      if (_userId == null) return;
+      final doc = await _alarmsCollection.doc(alarmId).get();
+      if (doc.exists) {
+        alarm = AlarmItem.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+      }
+    }
+    if (alarm != null) {
+      await _notificationService.cancelEscalatingFollowUps(
+        alarm.notificationId,
+      );
+    }
+  }
+
+  // ─── Backup reminder ──────────────────────────────────────────────────────
+
+  /// Returns true if a guest user should be shown the backup reminder.
+  /// Triggered when alarms ≥ 10 OR history ≥ 20.
+  Future<bool> shouldShowBackupReminder() async {
+    if (!_isGuest) return false;
+    final shouldShow = await SettingsService().shouldShowBackupReminder();
+    if (!shouldShow) return false;
+    final all = await _loadLocalAlarms();
+    final activeCount = all.where((a) => a.completedAt == null).length;
+    final historyCount = all.where((a) => a.completedAt != null).length;
+    return activeCount >= 10 || historyCount >= 20;
+  }
+
+  Future<void> markBackupReminderShown() =>
+      SettingsService().markBackupReminderShown();
+
+  // ─── Data migration (guest → account) ────────────────────────────────────
+
+  /// Call after successful linkWithCredential to push local alarms to Firestore.
+  Future<void> migrateLocalAlarmsToFirestore() async {
+    if (_userId == null) return;
+    final localAlarms = await _loadLocalAlarms();
+    if (localAlarms.isEmpty) return;
+
+    final batch = _firestore.batch();
+    for (final alarm in localAlarms) {
+      final ref = _alarmsCollection.doc();
+      batch.set(ref, alarm.toMap());
+    }
+    await batch.commit();
+
+    // Clear local storage after migration
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_localAlarmsKey);
   }
 }

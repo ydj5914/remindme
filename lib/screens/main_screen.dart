@@ -3,7 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import 'history_screen.dart';
 import 'statistics_screen.dart';
+import 'settings_screen.dart';
 import 'login_screen.dart';
+import '../services/alarm_service.dart';
+import '../services/widget_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -19,7 +22,47 @@ class _MainScreenState extends State<MainScreen> {
     RemindMeHomeScreen(),
     HistoryScreen(),
     StatisticsScreen(),
+    SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetService().initializeWidget();
+    _checkBackupReminder();
+  }
+
+  Future<void> _checkBackupReminder() async {
+    final should = await AlarmService().shouldShowBackupReminder();
+    if (!should || !mounted) return;
+    await AlarmService().markBackupReminderShown();
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Protect Your Data'),
+        content: const Text(
+          "You've built up quite a few routines! Sign in to back them up safely and sync across all your devices.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +95,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: 'Stats',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),

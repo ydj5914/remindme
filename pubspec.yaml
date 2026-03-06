@@ -20,7 +20,7 @@ version: 1.0.2+0
 #ex) remindme_alpha_v1.0.2
 
 environment:
-  sdk: ^3.11.0
+  sdk: ^3.10.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -66,6 +66,7 @@ dependencies:
 
   # Storage
   firebase_storage: ^12.3.6
+  shared_preferences: ^2.3.3
 
   # UI
   file_picker: ^8.1.6
