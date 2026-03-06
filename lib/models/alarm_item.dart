@@ -1,4 +1,4 @@
-import 'dart:ui';
+import 'package:flutter/material.dart';
 
 enum RepeatType {
   once, // 한 번만
@@ -36,6 +36,7 @@ class AlarmItem {
   final AlarmCategory category; // 카테고리
   final AlarmSound sound; // 알람 소리
   final String? voiceMemoPath; // 음성 메모 경로
+  final String? note; // 히스토리 메모/이모지
 
   AlarmItem({
     required this.id,
@@ -50,6 +51,7 @@ class AlarmItem {
     this.category = AlarmCategory.personal,
     this.sound = AlarmSound.defaultSound,
     this.voiceMemoPath,
+    this.note,
   }) : createdAt = createdAt ?? DateTime.now();
 
   // Firestore로부터 데이터 읽기
@@ -82,6 +84,7 @@ class AlarmItem {
         orElse: () => AlarmSound.defaultSound,
       ),
       voiceMemoPath: data['voiceMemoPath'] as String?,
+      note: data['note'] as String?,
     );
   }
 
@@ -101,6 +104,7 @@ class AlarmItem {
       'category': category.name,
       'sound': sound.name,
       'voiceMemoPath': voiceMemoPath,
+      'note': note,
     };
   }
 
@@ -117,6 +121,7 @@ class AlarmItem {
     AlarmCategory? category,
     AlarmSound? sound,
     String? voiceMemoPath,
+    String? note,
   }) {
     return AlarmItem(
       id: id ?? this.id,
@@ -131,6 +136,7 @@ class AlarmItem {
       category: category ?? this.category,
       sound: sound ?? this.sound,
       voiceMemoPath: voiceMemoPath ?? this.voiceMemoPath,
+      note: note ?? this.note,
     );
   }
 
@@ -139,16 +145,16 @@ class AlarmItem {
   String get repeatLabel {
     switch (repeatType) {
       case RepeatType.once:
-        return '한 번만';
+        return 'Once';
       case RepeatType.daily:
-        return '매일';
+        return 'Every day';
       case RepeatType.weekdays:
-        return '주중';
+        return 'Weekdays';
       case RepeatType.weekends:
-        return '주말';
+        return 'Weekends';
       case RepeatType.custom:
-        if (customDays == null || customDays!.isEmpty) return '사용자 지정';
-        final dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+        if (customDays == null || customDays!.isEmpty) return 'Custom';
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         return customDays!.map((d) => dayNames[d]).join(', ');
     }
   }
@@ -176,13 +182,26 @@ class AlarmItem {
   String get categoryLabel {
     switch (category) {
       case AlarmCategory.work:
-        return '업무';
+        return 'Work';
       case AlarmCategory.personal:
-        return '개인';
+        return 'Personal';
       case AlarmCategory.health:
-        return '건강';
+        return 'Health';
       case AlarmCategory.other:
-        return '기타';
+        return 'Other';
+    }
+  }
+
+  IconData get categoryIcon {
+    switch (category) {
+      case AlarmCategory.work:
+        return Icons.work_outline;
+      case AlarmCategory.personal:
+        return Icons.person_outline;
+      case AlarmCategory.health:
+        return Icons.favorite_outline;
+      case AlarmCategory.other:
+        return Icons.label_outline;
     }
   }
 

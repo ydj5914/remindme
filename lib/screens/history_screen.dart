@@ -13,7 +13,7 @@ class HistoryScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('알람 히스토리'),
+        title: const Text('History'),
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) async {
@@ -21,28 +21,27 @@ class HistoryScreen extends StatelessWidget {
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('히스토리 전체 삭제'),
-                    content: const Text('모든 히스토리를 삭제하시겠습니까?'),
+                    title: const Text('Clear History'),
+                    content: const Text('Delete all history entries?'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('취소'),
+                        child: const Text('Cancel'),
                       ),
                       FilledButton(
                         onPressed: () => Navigator.pop(context, true),
                         style: FilledButton.styleFrom(
                           backgroundColor: theme.colorScheme.error,
                         ),
-                        child: const Text('삭제'),
+                        child: const Text('Clear'),
                       ),
                     ],
                   ),
                 );
-
                 if (confirmed == true && context.mounted) {
                   await alarmService.clearHistory();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('히스토리가 삭제되었습니다')),
+                    const SnackBar(content: Text('History cleared')),
                   );
                 }
               }
@@ -54,7 +53,7 @@ class HistoryScreen extends StatelessWidget {
                   children: [
                     Icon(Icons.delete_sweep),
                     SizedBox(width: 8),
-                    Text('전체 삭제'),
+                    Text('Clear All'),
                   ],
                 ),
               ),
@@ -70,7 +69,7 @@ class HistoryScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('오류: ${snapshot.error}'));
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
 
           final history = snapshot.data ?? [];
@@ -83,13 +82,13 @@ class HistoryScreen extends StatelessWidget {
                   Icon(
                     Icons.history,
                     size: 64,
-                    color: theme.colorScheme.onSurface.withOpacity(0.3),
+                    color: theme.colorScheme.onSurface.withOpacity(0.2),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '완료된 알람이 없습니다',
+                    'No completed alarms yet',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withOpacity(0.4),
                     ),
                   ),
                 ],
@@ -97,16 +96,17 @@ class HistoryScreen extends StatelessWidget {
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             itemCount: history.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              return HistoryItemCard(
+              final isLast = index == history.length - 1;
+              return _TimelineItem(
                 alarm: history[index],
-                onDelete: () async {
-                  await alarmService.deleteHistory(history[index]);
-                },
+                isLast: isLast,
+                onDelete: () => alarmService.deleteHistory(history[index]),
+                onNoteChanged: (note) =>
+                    alarmService.updateHistoryNote(history[index].id, note),
               );
             },
           );
@@ -116,85 +116,231 @@ class HistoryScreen extends StatelessWidget {
   }
 }
 
-class HistoryItemCard extends StatelessWidget {
+class _TimelineItem extends StatefulWidget {
   final AlarmItem alarm;
+  final bool isLast;
   final VoidCallback onDelete;
+  final Future<void> Function(String) onNoteChanged;
 
-  const HistoryItemCard({
-    super.key,
+  const _TimelineItem({
     required this.alarm,
+    required this.isLast,
     required this.onDelete,
+    required this.onNoteChanged,
   });
+
+  @override
+  State<_TimelineItem> createState() => _TimelineItemState();
+}
+
+class _TimelineItemState extends State<_TimelineItem> {
+  void _showNoteDialog() async {
+    String note = widget.alarm.note ?? '';
+    final controller = TextEditingController(text: note);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Add a note',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.alarm.content,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Quick emoji row
+            Wrap(
+              spacing: 8,
+              children: ['🎯', '✅', '💪', '🌟', '😴', '🏃', '💧', '📖']
+                  .map((e) => GestureDetector(
+                        onTap: () {
+                          controller.text = e;
+                          note = e;
+                        },
+                        child: Text(e, style: const TextStyle(fontSize: 28)),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              onChanged: (v) => note = v,
+              decoration: const InputDecoration(
+                hintText: 'How did it go?',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await widget.onNoteChanged(controller.text);
+                },
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final timeFormat = DateFormat('HH:mm');
-    final dateFormat = DateFormat('M월 d일 (E)', 'ko');
-    final dateTimeFormat = DateFormat('M월 d일 HH:mm', 'ko');
+    final dateFormat = DateFormat('MMM d');
+    final categoryColor = widget.alarm.categoryColor;
 
-    return Dismissible(
-      key: Key(alarm.id),
-      direction: DismissDirection.endToStart,
-      onDismissed: (_) => onDelete(),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.error,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(Icons.delete, color: theme.colorScheme.onError),
-      ),
-      child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainerHighest,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Icon(
-                Icons.check_circle,
-                color: theme.colorScheme.primary.withOpacity(0.5),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Timeline line + dot
+          SizedBox(
+            width: 40,
+            child: Column(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: categoryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                if (!widget.isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: theme.colorScheme.onSurface.withOpacity(0.1),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Content
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 12,
+                bottom: widget.isLast ? 0 : 20,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      alarm.content,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
-                      ),
+              child: Dismissible(
+                key: Key(widget.alarm.id),
+                direction: DismissDirection.endToStart,
+                onDismissed: (_) => widget.onDelete(),
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.delete, color: theme.colorScheme.onError),
+                ),
+                child: GestureDetector(
+                  onTap: _showNoteDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: widget.alarm.note != null && widget.alarm.note!.isNotEmpty
+                          ? Border.all(color: categoryColor.withOpacity(0.4))
+                          : null,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '설정 시간: ${timeFormat.format(alarm.time)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.5),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(widget.alarm.categoryIcon,
+                                size: 14, color: categoryColor),
+                            const SizedBox(width: 6),
+                            Text(
+                              widget.alarm.content,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              timeFormat.format(widget.alarm.time),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: categoryColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (widget.alarm.completedAt != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Completed ${dateFormat.format(widget.alarm.completedAt!)} at ${timeFormat.format(widget.alarm.completedAt!)}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.4),
+                            ),
+                          ),
+                        ],
+                        if (widget.alarm.note != null && widget.alarm.note!.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: categoryColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              widget.alarm.note!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: categoryColor,
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Tap to add note ✏️',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.25),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    if (alarm.completedAt != null)
-                      Text(
-                        '완료: ${dateTimeFormat.format(alarm.completedAt!)}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.primary.withOpacity(0.7),
-                        ),
-                      ),
-                    if (alarm.snoozeCount > 0)
-                      Text(
-                        '스누즈 ${alarm.snoozeCount}회',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.4),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

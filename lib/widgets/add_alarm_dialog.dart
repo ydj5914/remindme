@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/alarm_item.dart';
 import '../services/alarm_service.dart';
+import 'custom_time_picker.dart';
 
 class AddAlarmDialog extends StatefulWidget {
-  const AddAlarmDialog({super.key});
+  final String? prefillContent;
+  const AddAlarmDialog({super.key, this.prefillContent});
 
   @override
   State<AddAlarmDialog> createState() => _AddAlarmDialogState();
@@ -11,29 +13,43 @@ class AddAlarmDialog extends StatefulWidget {
 
 class _AddAlarmDialogState extends State<AddAlarmDialog> {
   final AlarmService _alarmService = AlarmService();
-  String alarmContent = '';
+  late String alarmContent;
   TimeOfDay? selectedTime;
   RepeatType selectedRepeatType = RepeatType.daily;
   Set<int> selectedDays = {};
 
-  final List<String> dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+  final List<String> dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  late TextEditingController _contentController;
+
+  @override
+  void initState() {
+    super.initState();
+    alarmContent = widget.prefillContent ?? '';
+    _contentController = TextEditingController(text: alarmContent);
+  }
+
+  @override
+  void dispose() {
+    _contentController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      title: const Text('새 알람 추가'),
+      title: const Text('New Alarm'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 알람 내용 입력
             TextField(
+              controller: _contentController,
               decoration: const InputDecoration(
-                labelText: '알람 내용',
-                hintText: '예: 영양제 먹기',
+                labelText: 'Label',
+                hintText: 'e.g. Take vitamins',
                 border: OutlineInputBorder(),
               ),
               onChanged: (value) {
@@ -44,40 +60,26 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
             ),
             const SizedBox(height: 16),
 
-            // 시간 선택
             OutlinedButton.icon(
               onPressed: () async {
-                final time = await showTimePicker(
-                  context: context,
-                  initialTime: TimeOfDay.now(),
-                  builder: (context, child) {
-                    return Theme(
-                      data: theme.copyWith(
-                        timePickerTheme: TimePickerThemeData(
-                          backgroundColor: theme.colorScheme.surface,
-                        ),
-                      ),
-                      child: child!,
-                    );
-                  },
+                final time = await CustomTimePicker.show(
+                  context,
+                  initialTime: selectedTime ?? TimeOfDay.now(),
                 );
                 if (time != null) {
-                  setState(() {
-                    selectedTime = time;
-                  });
+                  setState(() => selectedTime = time);
                 }
               },
               icon: const Icon(Icons.access_time),
               label: Text(
                 selectedTime == null
-                    ? '시간 선택'
+                    ? 'Select time'
                     : '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}',
               ),
             ),
             const SizedBox(height: 16),
 
-            // 반복 설정
-            Text('반복 설정', style: theme.textTheme.titleSmall),
+            Text('Repeat', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
             DropdownButtonFormField<RepeatType>(
               value: selectedRepeatType,
@@ -92,19 +94,19 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
                 String label;
                 switch (type) {
                   case RepeatType.once:
-                    label = '한 번만';
+                    label = 'Once';
                     break;
                   case RepeatType.daily:
-                    label = '매일';
+                    label = 'Every day';
                     break;
                   case RepeatType.weekdays:
-                    label = '주중 (월-금)';
+                    label = 'Weekdays (Mon–Fri)';
                     break;
                   case RepeatType.weekends:
-                    label = '주말 (토-일)';
+                    label = 'Weekends (Sat–Sun)';
                     break;
                   case RepeatType.custom:
-                    label = '사용자 지정';
+                    label = 'Custom';
                     break;
                 }
                 return DropdownMenuItem(value: type, child: Text(label));
@@ -119,7 +121,6 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
               },
             ),
 
-            // 사용자 지정 요일 선택
             if (selectedRepeatType == RepeatType.custom) ...[
               const SizedBox(height: 12),
               Wrap(
@@ -148,27 +149,26 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
+          child: const Text('Cancel'),
         ),
         FilledButton(
           onPressed: () async {
             if (alarmContent.isEmpty) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('알람 내용을 입력해주세요')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter a label')),
+              );
               return;
             }
             if (selectedTime == null) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('시간을 선택해주세요')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select a time')),
+              );
               return;
             }
-            if (selectedRepeatType == RepeatType.custom &&
-                selectedDays.isEmpty) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('요일을 선택해주세요')));
+            if (selectedRepeatType == RepeatType.custom && selectedDays.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select at least one day')),
+              );
               return;
             }
 
@@ -196,7 +196,7 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      '알람이 ${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}에 설정되었습니다',
+                      'Alarm set for ${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}',
                     ),
                     backgroundColor: theme.colorScheme.primary,
                   ),
@@ -206,14 +206,14 @@ class _AddAlarmDialogState extends State<AddAlarmDialog> {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('알람 설정 실패: $e'),
+                    content: Text('Failed to set alarm: $e'),
                     backgroundColor: theme.colorScheme.error,
                   ),
                 );
               }
             }
           },
-          child: const Text('추가'),
+          child: const Text('Add'),
         ),
       ],
     );

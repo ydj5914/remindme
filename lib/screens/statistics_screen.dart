@@ -13,7 +13,7 @@ class StatisticsScreen extends StatelessWidget {
     final alarmService = AlarmService();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('통계')),
+      appBar: AppBar(title: const Text('Stats')),
       body: StreamBuilder<List<AlarmItem>>(
         stream: alarmService.getHistoryStream(),
         builder: (context, snapshot) {
@@ -22,31 +22,41 @@ class StatisticsScreen extends StatelessWidget {
           }
 
           final history = snapshot.data ?? [];
-          final stats = _calculateStatistics(history);
+          final stats = _calculateStats(history);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 요약 카드
+                // Analysis phrase
+                if (history.isNotEmpty) ...[
+                  _AnalysisBanner(
+                    weekCount: stats['thisWeek'] as int,
+                    weekTotal: stats['weekTotal'] as int,
+                    theme: theme,
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // Summary cards
                 Row(
                   children: [
                     Expanded(
                       child: _StatCard(
-                        title: '완료율',
-                        value: '${stats['completionRate']}%',
-                        icon: Icons.check_circle,
+                        title: 'Total Done',
+                        value: '${history.length}',
+                        icon: Icons.done_all,
                         color: theme.colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _StatCard(
-                        title: '평균 스누즈',
-                        value: '${stats['avgSnooze']}회',
-                        icon: Icons.snooze,
-                        color: theme.colorScheme.secondary,
+                        title: 'This Week',
+                        value: '${stats['thisWeek']}',
+                        icon: Icons.calendar_today,
+                        color: const Color(0xFF26A69A),
                       ),
                     ),
                   ],
@@ -56,19 +66,19 @@ class StatisticsScreen extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _StatCard(
-                        title: '총 완료',
-                        value: '${history.length}개',
-                        icon: Icons.done_all,
-                        color: theme.colorScheme.tertiary,
+                        title: 'Avg Snooze',
+                        value: '${stats['avgSnooze']}x',
+                        icon: Icons.snooze,
+                        color: theme.colorScheme.secondary,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _StatCard(
-                        title: '이번 주',
-                        value: '${stats['thisWeek']}개',
-                        icon: Icons.calendar_today,
-                        color: Colors.green,
+                        title: 'Best Day',
+                        value: stats['bestDay'] as String,
+                        icon: Icons.emoji_events_outlined,
+                        color: const Color(0xFFFFA726),
                       ),
                     ),
                   ],
@@ -76,55 +86,40 @@ class StatisticsScreen extends StatelessWidget {
 
                 const SizedBox(height: 32),
 
-                // 카테고리별 통계
-                Text('카테고리별 완료', style: theme.textTheme.titleLarge),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 200,
-                  child: _CategoryPieChart(history: history),
+                // 30-day Heatmap
+                Text('30-Day Activity', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(
+                  'Color intensity = completions per day',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
+                  ),
                 ),
+                const SizedBox(height: 16),
+                _HeatmapGrid(history: history, baseColor: theme.colorScheme.primary),
 
                 const SizedBox(height: 32),
 
-                // 주간 추세
-                Text('주간 완료 추세', style: theme.textTheme.titleLarge),
+                // Category breakdown
+                Text('By Category', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
-                SizedBox(height: 200, child: _WeeklyBarChart(history: history)),
+                if (history.isEmpty)
+                  Center(
+                    child: Text('No data yet',
+                        style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.3))),
+                  )
+                else
+                  SizedBox(
+                    height: 180,
+                    child: _CategoryPieChart(history: history),
+                  ),
 
                 const SizedBox(height: 32),
 
-                // 시간대별 완료
-                Text('시간대별 완료', style: theme.textTheme.titleLarge),
+                // Weekly bar chart
+                Text('Weekly Trend', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
-                ...List.generate(24, (hour) {
-                  final count = history
-                      .where((alarm) => alarm.time.hour == hour)
-                      .length;
-                  if (count == 0) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 60,
-                          child: Text(
-                            '${hour.toString().padLeft(2, '0')}:00',
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ),
-                        Expanded(
-                          child: LinearProgressIndicator(
-                            value: count / history.length,
-                            minHeight: 20,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text('$count'),
-                      ],
-                    ),
-                  );
-                }),
+                SizedBox(height: 180, child: _WeeklyBarChart(history: history)),
               ],
             ),
           );
@@ -133,32 +128,221 @@ class StatisticsScreen extends StatelessWidget {
     );
   }
 
-  Map<String, dynamic> _calculateStatistics(List<AlarmItem> history) {
+  Map<String, dynamic> _calculateStats(List<AlarmItem> history) {
     if (history.isEmpty) {
-      return {'completionRate': 0, 'avgSnooze': 0, 'thisWeek': 0};
+      return {
+        'thisWeek': 0,
+        'weekTotal': 7,
+        'avgSnooze': '0.0',
+        'bestDay': '-',
+      };
     }
 
     final now = DateTime.now();
     final weekAgo = now.subtract(const Duration(days: 7));
-
-    final thisWeekCount = history
-        .where(
-          (alarm) =>
-              alarm.completedAt != null && alarm.completedAt!.isAfter(weekAgo),
-        )
+    final thisWeek = history
+        .where((a) => a.completedAt != null && a.completedAt!.isAfter(weekAgo))
         .length;
 
-    final totalSnooze = history.fold<int>(
-      0,
-      (sum, alarm) => sum + alarm.snoozeCount,
-    );
+    final totalSnooze =
+        history.fold<int>(0, (sum, a) => sum + a.snoozeCount);
     final avgSnooze = (totalSnooze / history.length).toStringAsFixed(1);
 
+    // Best weekday
+    final counts = List.filled(7, 0);
+    for (final a in history) {
+      if (a.completedAt != null) {
+        counts[a.completedAt!.weekday - 1]++;
+      }
+    }
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final maxIdx = counts.indexOf(counts.reduce((a, b) => a > b ? a : b));
+    final bestDay = counts[maxIdx] > 0 ? days[maxIdx] : '-';
+
     return {
-      'completionRate': 100, // 완료된 것만 히스토리에 있으므로 100%
+      'thisWeek': thisWeek,
+      'weekTotal': 7,
       'avgSnooze': avgSnooze,
-      'thisWeek': thisWeekCount,
+      'bestDay': bestDay,
     };
+  }
+}
+
+class _AnalysisBanner extends StatelessWidget {
+  final int weekCount;
+  final int weekTotal;
+  final ThemeData theme;
+
+  const _AnalysisBanner({
+    required this.weekCount,
+    required this.weekTotal,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = weekTotal > 0 ? (weekCount / weekTotal * 100).round() : 0;
+    final emoji = pct >= 80 ? '🚀' : pct >= 50 ? '💪' : '🌱';
+    final msg = pct >= 80
+        ? "You're crushing it!"
+        : pct >= 50
+            ? "Keep the momentum going!"
+            : "Every streak starts with one.";
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary.withOpacity(0.2),
+            theme.colorScheme.secondary.withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.primary.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$emoji $msg',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "You've completed $weekCount routine${weekCount == 1 ? '' : 's'} this week.",
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeatmapGrid extends StatelessWidget {
+  final List<AlarmItem> history;
+  final Color baseColor;
+
+  const _HeatmapGrid({required this.history, required this.baseColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final days = List.generate(30, (i) {
+      final d = now.subtract(Duration(days: 29 - i));
+      return DateTime(d.year, d.month, d.day);
+    });
+
+    // Count completions per day
+    final counts = <DateTime, int>{};
+    for (final a in history) {
+      if (a.completedAt != null) {
+        final d = DateTime(
+          a.completedAt!.year,
+          a.completedAt!.month,
+          a.completedAt!.day,
+        );
+        counts[d] = (counts[d] ?? 0) + 1;
+      }
+    }
+    final maxCount = counts.values.fold(0, (a, b) => a > b ? a : b);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Day labels
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(DateFormat('MMM d').format(days.first),
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.4))),
+            Text(DateFormat('MMM d').format(days.last),
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.4))),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Grid
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: days.map((day) {
+            final count = counts[day] ?? 0;
+            final intensity = maxCount > 0 ? count / maxCount : 0.0;
+            return Tooltip(
+              message:
+                  '${DateFormat('MMM d').format(day)}: $count completion${count == 1 ? '' : 's'}',
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: count == 0
+                      ? Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.07)
+                      : baseColor.withOpacity(0.2 + intensity * 0.8),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 8),
+        // Legend
+        Row(
+          children: [
+            Text('Less  ',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.4))),
+            ...List.generate(
+              5,
+              (i) => Container(
+                width: 14,
+                height: 14,
+                margin: const EdgeInsets.only(right: 3),
+                decoration: BoxDecoration(
+                  color: i == 0
+                      ? Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.07)
+                      : baseColor.withOpacity(0.2 + (i / 4) * 0.8),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            Text('  More',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.4))),
+          ],
+        ),
+      ],
+    );
   }
 }
 
@@ -183,20 +367,23 @@ class _StatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 32),
+            Icon(icon, color: color, size: 28),
             const SizedBox(height: 8),
             Text(
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
             ),
             Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              ),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.55),
+                  ),
             ),
           ],
         ),
@@ -207,27 +394,24 @@ class _StatCard extends StatelessWidget {
 
 class _CategoryPieChart extends StatelessWidget {
   final List<AlarmItem> history;
-
   const _CategoryPieChart({required this.history});
 
   @override
   Widget build(BuildContext context) {
     final categoryCount = <AlarmCategory, int>{};
-    for (final alarm in history) {
-      categoryCount[alarm.category] = (categoryCount[alarm.category] ?? 0) + 1;
+    for (final a in history) {
+      categoryCount[a.category] = (categoryCount[a.category] ?? 0) + 1;
     }
-
     if (categoryCount.isEmpty) {
-      return const Center(child: Text('데이터가 없습니다'));
+      return const Center(child: Text('No data'));
     }
-
     return PieChart(
       PieChartData(
         sections: categoryCount.entries.map((entry) {
-          final percentage = (entry.value / history.length * 100).toInt();
+          final pct = (entry.value / history.length * 100).toInt();
           return PieChartSectionData(
             value: entry.value.toDouble(),
-            title: '$percentage%',
+            title: '$pct%',
             color: AlarmItem(
               id: '',
               time: DateTime.now(),
@@ -236,6 +420,8 @@ class _CategoryPieChart extends StatelessWidget {
               category: entry.key,
             ).categoryColor,
             radius: 50,
+            titleStyle: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
           );
         }).toList(),
         sectionsSpace: 2,
@@ -247,55 +433,63 @@ class _CategoryPieChart extends StatelessWidget {
 
 class _WeeklyBarChart extends StatelessWidget {
   final List<AlarmItem> history;
-
   const _WeeklyBarChart({required this.history});
 
   @override
   Widget build(BuildContext context) {
-    final weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final counts = List.filled(7, 0);
-
-    for (final alarm in history) {
-      if (alarm.completedAt != null) {
-        final weekday = alarm.completedAt!.weekday - 1;
-        counts[weekday]++;
+    for (final a in history) {
+      if (a.completedAt != null) {
+        counts[a.completedAt!.weekday - 1]++;
       }
     }
+    final maxY = counts.reduce((a, b) => a > b ? a : b).toDouble();
 
     return BarChart(
       BarChartData(
-        maxY: counts.reduce((a, b) => a > b ? a : b).toDouble() + 1,
-        barGroups: List.generate(7, (index) {
+        maxY: maxY + 1,
+        barGroups: List.generate(7, (i) {
           return BarChartGroupData(
-            x: index,
+            x: i,
             barRods: [
               BarChartRodData(
-                toY: counts[index].toDouble(),
-                color: Theme.of(context).colorScheme.primary,
-                width: 20,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(4),
+                toY: counts[i].toDouble(),
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
                 ),
+                width: 18,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(4)),
               ),
             ],
           );
         }),
         titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
+          leftTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              getTitlesWidget: (value, meta) {
-                return Text(weekdays[value.toInt()]);
-              },
+              getTitlesWidget: (value, meta) => Text(
+                weekdays[value.toInt()],
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.5),
+                ),
+              ),
             ),
           ),
         ),

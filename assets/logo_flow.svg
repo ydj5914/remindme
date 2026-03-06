@@ -1,0 +1,43 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+  <defs>
+    <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2196F3"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle (subtle) -->
+  <circle cx="50" cy="50" r="46" fill="none" stroke="url(#flowGrad)" stroke-width="1.5" opacity="0.15"/>
+
+  <!-- Open-circle arc (loop arrow, ~300°) -->
+  <path
+    d="M 50 12
+       A 38 38 0 1 1 19.6 69"
+    fill="none"
+    stroke="url(#flowGrad)"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+
+  <!-- Arrow head at arc end -->
+  <polyline
+    points="10,61 19.6,69 28,60"
+    fill="none"
+    stroke="url(#flowGrad)"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Clock hand pointing to ~2 o'clock -->
+  <line
+    x1="50" y1="50"
+    x2="69" y2="33"
+    stroke="url(#flowGrad)"
+    stroke-width="5"
+    stroke-linecap="round"
+  />
+
+  <!-- Center dot -->
+  <circle cx="50" cy="50" r="4" fill="url(#flowGrad)"/>
+</svg>

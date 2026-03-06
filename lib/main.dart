@@ -10,54 +10,34 @@ import 'services/alarm_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 날짜 포맷 초기화 (한국어)
   await initializeDateFormatting('ko', null);
 
-  // Firebase 초기화
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // 알림 서비스 초기화 (알림 클릭 콜백 포함)
+  // Sign in anonymously for guest mode
+  if (FirebaseAuth.instance.currentUser == null) {
+    try {
+      await FirebaseAuth.instance.signInAnonymously();
+    } catch (e) {
+      // Anonymous auth may be disabled in Firebase Console.
+      // App continues without a user — sign-in screen will be shown.
+      debugPrint('Anonymous sign-in failed: $e');
+    }
+  }
+
   await NotificationService().initialize(
     onNotificationTapped: (alarmId, action) async {
-      print('Notification tapped: alarmId=$alarmId, action=$action');
-
-      // 익명 로그인이 되어있지 않으면 로그인 먼저
-      if (FirebaseAuth.instance.currentUser == null) {
-        await _signInAnonymously();
-      }
-
-      // 액션에 따라 처리
       if (action == 'complete' || action == 'open') {
-        // 완료 처리
         await AlarmService().completeAlarm(alarmId);
       } else if (action == 'snooze') {
-        // 스누즈 처리
         await AlarmService().snoozeAlarm(alarmId, minutes: 10);
       }
     },
   );
 
-  // 익명 로그인 (사용자 인증)
-  await _signInAnonymously();
-
-  // 재부팅 후 알람 복원
   await AlarmService().restoreAlarmsAfterReboot();
 
   runApp(const RemindMeApp());
-}
-
-Future<void> _signInAnonymously() async {
-  try {
-    final auth = FirebaseAuth.instance;
-    if (auth.currentUser == null) {
-      await auth.signInAnonymously();
-      print('익명 로그인 성공');
-    } else {
-      print('이미 로그인됨: ${auth.currentUser?.uid}');
-    }
-  } catch (e) {
-    print('익명 로그인 실패: $e');
-  }
 }
 
 class RemindMeApp extends StatelessWidget {
@@ -68,19 +48,24 @@ class RemindMeApp extends StatelessWidget {
     return MaterialApp(
       title: 'Remind Me',
       debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.dark,
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
+          seedColor: const Color(0xFF7C3AED),
           brightness: Brightness.light,
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
+          seedColor: const Color(0xFF7C3AED),
           brightness: Brightness.dark,
+        ).copyWith(
+          surface: const Color(0xFF0F0F14),
+          surfaceContainerHighest: const Color(0xFF1C1C25),
         ),
+        scaffoldBackgroundColor: const Color(0xFF0F0F14),
       ),
       home: const MainScreen(),
     );

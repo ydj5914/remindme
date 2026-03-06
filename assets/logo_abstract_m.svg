@@ -1,0 +1,29 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+  <defs>
+    <linearGradient id="mGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B35"/>
+      <stop offset="100%" stop-color="#FF9500"/>
+    </linearGradient>
+  </defs>
+
+  <!-- White background -->
+  <rect width="100" height="100" rx="22" fill="#FFFFFF"/>
+
+  <!-- Abstract M as heartbeat/mountain pulse -->
+  <!-- Left baseline → first peak → valley → second peak → right baseline -->
+  <polyline
+    points="8,62  22,62  32,30  44,54  50,42  56,54  68,30  78,62  92,62"
+    fill="none"
+    stroke="url(#mGrad)"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Focus dot at center valley -->
+  <circle cx="50" cy="42" r="5.5" fill="url(#mGrad)"/>
+  <circle cx="50" cy="42" r="9" fill="none" stroke="url(#mGrad)" stroke-width="2" opacity="0.35"/>
+
+  <!-- Subtle baseline shadow line -->
+  <line x1="8" y1="62" x2="92" y2="62" stroke="url(#mGrad)" stroke-width="2.5" stroke-linecap="round" opacity="0.2"/>
+</svg>
