@@ -281,6 +281,31 @@ class AlarmService {
     await restoreAlarmsAfterReboot();
   }
 
+  /// 현재 알람 개수 조회
+  Future<int> getAlarmCount() async {
+    if (_userId == null) return 0;
+    final snapshot = await _alarmsCollection
+        .where('completedAt', isNull: true)
+        .get();
+    return snapshot.docs.length;
+  }
+
+  /// 히스토리 메모/이모지 업데이트
+  Future<void> updateHistoryNote(String alarmId, String note) async {
+    try {
+      await _alarmsCollection.doc(alarmId).update({'note': note});
+    } catch (e) {
+      throw Exception('Failed to update note: $e');
+    }
+  }
+
+  /// 익명 계정을 Google 계정으로 연결 (게스트 → 계정)
+  Future<void> linkWithGoogle(OAuthCredential credential) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await user.linkWithCredential(credential);
+  }
+
   /// 스누즈 처리
   Future<void> snoozeAlarm(String alarmId, {int minutes = 10}) async {
     if (_userId == null) {

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/alarm_item.dart';
 import '../services/alarm_service.dart';
 import '../widgets/add_alarm_dialog.dart';
+import 'login_screen.dart';
 
 class RemindMeHomeScreen extends StatefulWidget {
   const RemindMeHomeScreen({super.key});
@@ -14,10 +17,42 @@ class RemindMeHomeScreen extends StatefulWidget {
 class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
   final AlarmService _alarmService = AlarmService();
 
-  Future<void> _showAddAlarmDialog() async {
+  Future<void> _showAddAlarmDialog({String? prefillContent}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final isGuest = user?.isAnonymous ?? true;
+    if (isGuest) {
+      final count = await _alarmService.getAlarmCount();
+      if (count >= 5) {
+        if (!mounted) return;
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Upgrade to Continue'),
+            content: const Text(
+              'You\'ve used all 5 free alarm slots.\nSign in to unlock unlimited alarms and sync across devices.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()));
+                },
+                child: const Text('Sign In'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
     await showDialog(
       context: context,
-      builder: (context) => const AddAlarmDialog(),
+      builder: (context) => AddAlarmDialog(prefillContent: prefillContent),
     );
   }
 
@@ -172,6 +207,97 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
     }
   }
 
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  }
+
+  void _showAccountDialog() {
+    final user = FirebaseAuth.instance.currentUser;
+    final isGuest = user?.isAnonymous ?? true;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Account'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isGuest)
+              const Text('Guest mode', style: TextStyle(fontSize: 14))
+            else ...[
+              if (user?.displayName != null)
+                Text(user!.displayName!, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              if (user?.email != null)
+                Text(user!.email!, style: const TextStyle(fontSize: 13)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          if (!isGuest)
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await GoogleSignIn().signOut();
+                await FirebaseAuth.instance.signOut();
+                // Re-sign in anonymously for guest mode
+                await FirebaseAuth.instance.signInAnonymously();
+              },
+              child: const Text('Sign Out'),
+            ),
+          if (!isGuest)
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete Account'),
+                    content: const Text(
+                      'This will permanently delete your account and all data. This action cannot be undone.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  try {
+                    await GoogleSignIn().signOut();
+                    await FirebaseAuth.instance.currentUser?.delete();
+                    await FirebaseAuth.instance.signInAnonymously();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to delete account: $e')),
+                      );
+                    }
+                  }
+                }
+              },
+              child: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -192,15 +318,20 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),
-            tooltip: '알람 동기화',
+            tooltip: 'Sync alarms',
             onPressed: () async {
               await _alarmService.syncAlarms();
               if (mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('알람이 동기화되었습니다')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Alarms synced')),
+                );
               }
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            tooltip: '계정',
+            onPressed: () => _showAccountDialog(),
           ),
         ],
       ),
@@ -237,68 +368,52 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. 인사말 섹션
+                // 1. Header
                 Text(
-                  '안녕하세요!',
+                  'Good ${_greeting()}!',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '오늘 설정된 알람이 ${alarmList.length}개 있습니다.',
+                  alarmList.isEmpty
+                      ? 'No alarms set yet.'
+                      : '${alarmList.length} alarm${alarmList.length == 1 ? '' : 's'} scheduled.',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // 2. 알람 리스트 섹션
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '내 알람 목록',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (alarmList.isNotEmpty)
+                // 2. List header
+                if (alarmList.isNotEmpty) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
                       Text(
-                        '← 스와이프로 삭제',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        'My Alarms',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                      Text(
+                        'Swipe to delete',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
-                // 3. 알람 리스트 또는 빈 상태
+                // 3. List or empty state
                 Expanded(
                   child: alarmList.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.alarm_off,
-                                size: 64,
-                                color: theme.colorScheme.onSurface.withOpacity(
-                                  0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                '설정된 알람이 없어요.\n+ 버튼을 눌러보세요!',
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.5),
-                                ),
-                              ),
-                            ],
-                          ),
+                      ? _QuickStartSection(
+                          onTap: (content) =>
+                              _showAddAlarmDialog(prefillContent: content),
                         )
                       : ListView.separated(
                           itemCount: alarmList.length,
@@ -307,8 +422,7 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
                           itemBuilder: (context, index) {
                             return AlarmItemCard(
                               alarm: alarmList[index],
-                              onToggle: (value) =>
-                                  _toggleAlarm(alarmList[index]),
+                              onToggle: () => _toggleAlarm(alarmList[index]),
                               onDelete: () => _deleteAlarm(alarmList[index]),
                             );
                           },
@@ -318,6 +432,87 @@ class _RemindMeHomeScreenState extends State<RemindMeHomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _QuickStartSection extends StatelessWidget {
+  final void Function(String content) onTap;
+  const _QuickStartSection({required this.onTap});
+
+  static const _suggestions = [
+    (icon: Icons.wb_sunny_outlined, label: 'Wake up', color: Color(0xFFFFA726)),
+    (icon: Icons.self_improvement, label: 'Meditate', color: Color(0xFF7C3AED)),
+    (icon: Icons.water_drop_outlined, label: 'Drink Water', color: Color(0xFF29B6F6)),
+    (icon: Icons.fitness_center, label: 'Exercise', color: Color(0xFF26A69A)),
+    (icon: Icons.menu_book_outlined, label: 'Read', color: Color(0xFFEC407A)),
+    (icon: Icons.bedtime_outlined, label: 'Sleep', color: Color(0xFF5C6BC0)),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 24),
+          Icon(
+            Icons.alarm_add_outlined,
+            size: 56,
+            color: theme.colorScheme.onSurface.withOpacity(0.2),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No alarms yet',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.4),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Quick start with a routine:',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.3),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: _suggestions.map((s) {
+              return InkWell(
+                onTap: () => onTap(s.label),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: s.color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: s.color.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(s.icon, size: 18, color: s.color),
+                      const SizedBox(width: 8),
+                      Text(
+                        s.label,
+                        style: TextStyle(
+                          color: s.color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -339,7 +534,7 @@ class AlarmItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final timeFormat = DateFormat('HH:mm');
-    final dateFormat = DateFormat('M월 d일 (E)', 'ko');
+    final categoryColor = alarm.categoryColor;
 
     return Dismissible(
       key: Key(alarm.id),
@@ -349,19 +544,19 @@ class AlarmItemCard extends StatelessWidget {
         return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('알람 삭제'),
-            content: Text('\'${alarm.content}\' 알람을 삭제하시겠습니까?'),
+            title: const Text('Delete Alarm'),
+            content: Text('Delete "${alarm.content}"?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
+                child: const Text('Cancel'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.colorScheme.error,
                 ),
-                child: const Text('삭제'),
+                child: const Text('Delete'),
               ),
             ],
           ),
@@ -383,11 +578,14 @@ class AlarmItemCard extends StatelessWidget {
           padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
-              Icon(
-                Icons.notifications,
-                color: alarm.isActive
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withOpacity(0.3),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: categoryColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(alarm.categoryIcon, color: categoryColor, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -399,25 +597,45 @@ class AlarmItemCard extends StatelessWidget {
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: alarm.isActive
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface.withOpacity(0.5),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      alarm.content,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: alarm.isActive
-                            ? null
-                            : theme.colorScheme.onSurface.withOpacity(0.5),
+                            ? categoryColor
+                            : theme.colorScheme.onSurface.withOpacity(0.4),
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      alarm.repeatLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                      alarm.content,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: alarm.isActive
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurface.withOpacity(0.4),
                       ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: categoryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            alarm.categoryLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: categoryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          alarm.repeatLabel,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.4),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
